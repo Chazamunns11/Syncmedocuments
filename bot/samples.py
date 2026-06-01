@@ -6,10 +6,24 @@ Pinnacle's fair price so a value bet is found even after commission.
 """
 from __future__ import annotations
 
+import datetime as _dt
 from typing import List
 
 from .devig import devig
 from .models import FairLine, VenueQuote
+
+
+def _soon(seconds: float) -> str:
+    """ISO timestamp ``seconds`` from now (UTC), so the offline demo has events
+    near kickoff for the continuous watcher to place on."""
+    return (_dt.datetime.now(_dt.timezone.utc)
+            + _dt.timedelta(seconds=seconds)).isoformat()
+
+
+# Event 1 starts ~2 minutes out (inside the default place window for `watch`);
+# event 2 starts ~2 hours out (well outside it).
+_T1 = _soon(120)
+_T2 = _soon(7200)
 
 
 def sample_pinnacle_lines(sport_key: str = "soccer_epl") -> List[FairLine]:
@@ -20,7 +34,7 @@ def sample_pinnacle_lines(sport_key: str = "soccer_epl") -> List[FairLine]:
     probs = devig(odds, "multiplicative")
     lines.append(FairLine(
         event_key="pin_1", sport_key=sport_key,
-        commence_time="2026-06-02T18:00:00+00:00",
+        commence_time=_T1,
         home_team="Arsenal", away_team="Chelsea", market="h2h",
         probs=dict(zip(names, probs)), source="pinnacle",
     ))
@@ -30,7 +44,7 @@ def sample_pinnacle_lines(sport_key: str = "soccer_epl") -> List[FairLine]:
     probs2 = devig(odds2, "multiplicative")
     lines.append(FairLine(
         event_key="pin_2", sport_key=sport_key,
-        commence_time="2026-06-02T20:00:00+00:00",
+        commence_time=_T2,
         home_team="Liverpool", away_team="Everton", market="h2h",
         probs=dict(zip(names2, probs2)), source="pinnacle",
     ))
@@ -42,18 +56,18 @@ def sample_betfair_quotes() -> List[VenueQuote]:
         # Event 1: Arsenal backable at 2.20 vs Pinnacle fair ~2.00 -> value.
         VenueQuote("betfair", "1.111", "47999", "Arsenal", 2.20, 350.0,
                    "Arsenal v Chelsea", "Arsenal", "Chelsea",
-                   "2026-06-02T18:00:00+00:00", "h2h"),
+                   _T1, "h2h"),
         VenueQuote("betfair", "1.111", "47998", "Chelsea", 4.10, 120.0,
                    "Arsenal v Chelsea", "Arsenal", "Chelsea",
-                   "2026-06-02T18:00:00+00:00", "h2h"),
+                   _T1, "h2h"),
         VenueQuote("betfair", "1.111", "58805", "The Draw", 3.55, 200.0,
                    "Arsenal v Chelsea", "Arsenal", "Chelsea",
-                   "2026-06-02T18:00:00+00:00", "h2h"),
+                   _T1, "h2h"),
         # Event 2: priced at/under fair -> no value after commission.
         VenueQuote("betfair", "1.222", "12345", "Liverpool", 1.49, 500.0,
                    "Liverpool v Everton", "Liverpool", "Everton",
-                   "2026-06-02T20:00:00+00:00", "h2h"),
+                   _T2, "h2h"),
         VenueQuote("betfair", "1.222", "12346", "Everton", 6.80, 90.0,
                    "Liverpool v Everton", "Liverpool", "Everton",
-                   "2026-06-02T20:00:00+00:00", "h2h"),
+                   _T2, "h2h"),
     ]

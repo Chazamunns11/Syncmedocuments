@@ -71,6 +71,10 @@ class BetfairClient:
         self.certs_path = certs_path
         self.locale = locale
         self._client = None
+        # Cache of market_id -> {runner names, event meta} so that near kickoff
+        # we can refresh just the prices (list_market_book) without re-pulling
+        # the full catalogue, cutting latency and API load.
+        self._catalogue: Dict[str, dict] = {}
 
     # -- session -----------------------------------------------------------
     def trading(self):
@@ -96,6 +100,15 @@ class BetfairClient:
             client.login_interactive()
         self._client = client
         return client
+
+    def keep_alive(self) -> None:
+        """Refresh the session token. Betfair sessions otherwise expire (~4h);
+        call this periodically from a long-running loop."""
+        if self._client is not None:
+            try:
+                self._client.keep_alive()
+            except Exception:
+                pass
 
     def close(self) -> None:
         if self._client is not None:
@@ -143,32 +156,38 @@ class BetfairClient:
         if not catalogues:
             return []
 
-        # selection_id -> runner_name, and market_id -> event meta
-        runner_names: Dict[str, Dict[str, str]] = {}
-        market_meta: Dict[str, dict] = {}
+        # Cache the catalogue (runner names + event meta) keyed by market_id.
         for cat in catalogues:
-            names = {str(r.selection_id): r.runner_name for r in cat.runners}
-            runner_names[cat.market_id] = names
             home, away = _split_event_name(cat.event.name)
-            market_meta[cat.market_id] = {
+            self._catalogue[cat.market_id] = {
+                "names": {str(r.selection_id): r.runner_name for r in cat.runners},
                 "event_name": cat.event.name,
                 "home": home,
                 "away": away,
-                "start": getattr(cat, "market_start_time", None),
+                "start": _iso(getattr(cat, "market_start_time", None)),
             }
+        return self.refresh_prices([c.market_id for c in catalogues])
 
-        market_ids = [c.market_id for c in catalogues]
+    def refresh_prices(self, market_ids: List[str]) -> List[VenueQuote]:
+        """Fetch only current best-back prices for already-catalogued markets.
+
+        Use this for tight near-kickoff polling: it skips the heavier market
+        catalogue call and reuses the cached runner/event metadata."""
+        if not market_ids:
+            return []
+        from betfairlightweight import filters
+
+        client = self.trading()
         books = client.betting.list_market_book(
             market_ids=market_ids,
             price_projection=filters.price_projection(
                 price_data=filters.price_data(ex_best_offers=True)
             ),
         )
-
         quotes: List[VenueQuote] = []
         for book in books:
-            meta = market_meta.get(book.market_id, {})
-            names = runner_names.get(book.market_id, {})
+            meta = self._catalogue.get(book.market_id, {})
+            names = meta.get("names", {})
             for runner in book.runners:
                 back = runner.ex.available_to_back if runner.ex else []
                 if not back:
@@ -219,6 +238,14 @@ class BetfairClient:
         return client.betting.place_orders(
             market_id=market_id, instructions=[instruction]
         )
+
+
+def _iso(value):
+    """Normalise a Betfair market_start_time (datetime or str) to an ISO string."""
+    if value is None:
+        return ""
+    iso = getattr(value, "isoformat", None)
+    return iso() if callable(iso) else str(value)
 
 
 def _split_event_name(name: str):

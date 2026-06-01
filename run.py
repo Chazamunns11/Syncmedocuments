@@ -9,6 +9,9 @@ Examples
   # Identify, place (paper by default) and log:
   python run.py run
 
+  # Run continuously, placing each bet as close to kickoff as possible:
+  python run.py watch
+
   # Show logged placements and running P&L:
   python run.py report
 
@@ -74,6 +77,31 @@ def cmd_run(cfg: Config) -> int:
         bot.close()
 
 
+def cmd_watch(cfg: Config) -> int:
+    from bot.scheduler import ContinuousRunner
+    bot = ValueBettingBot(cfg)
+    runner = ContinuousRunner(
+        bot,
+        poll_interval=cfg.poll_interval_seconds,
+        refresh_interval=cfg.refresh_interval_seconds,
+        place_window_minutes=cfg.place_window_minutes,
+        min_seconds_before_start=cfg.min_seconds_before_start,
+    )
+    mode = "LIVE" if (cfg.live and cfg.executor == "betfair") else "PAPER"
+    print(f"Watching continuously in {mode} mode. "
+          f"Placing within {cfg.place_window_minutes:.0f} min of kickoff. "
+          f"Ctrl-C to stop.")
+    try:
+        runner.run()
+        return 0
+    except KeyboardInterrupt:
+        print("\nStopping...")
+        runner.stop()
+        return 0
+    finally:
+        bot.close()
+
+
 def cmd_report(cfg: Config) -> int:
     bot = ValueBettingBot(cfg)
     try:
@@ -84,6 +112,11 @@ def cmd_report(cfg: Config) -> int:
         print(f"  settled:        won {s['won']}  lost {s['lost']}  pending {s['pending']}")
         print(f"  realised P&L:   {_fmt_money(s['profit'])}")
         print(f"  ROI (settled):  {s['roi']*100:+.2f}%")
+        print(f"  avg edge:       {(s['avg_edge'] or 0)*100:+.2f}%")
+        if s["clv_n"]:
+            print(f"  CLV:            avg {(s['avg_clv'] or 0)*100:+.2f}%  "
+                  f"beat close {s['clv_beat']}/{s['clv_n']} "
+                  f"({s['clv_beat_rate']*100:.0f}%)")
         print("\n=== Recent placements ===")
         for row in bot.store.recent_placements(limit=20):
             print(f"  {row['placed_at'][:19]} {row['status']:8s} "
@@ -114,7 +147,8 @@ def main(argv=None) -> int:
     parser.add_argument("-v", "--verbose", action="store_true")
     sub = parser.add_subparsers(dest="command", required=True)
     sub.add_parser("scan", help="identify value bets only")
-    sub.add_parser("run", help="identify, place and log value bets")
+    sub.add_parser("run", help="identify, place and log value bets (one shot)")
+    sub.add_parser("watch", help="run continuously, placing bets near kickoff")
     sub.add_parser("report", help="show logged placements and P&L")
     p_settle = sub.add_parser("settle", help="mark a placed bet WON/LOST/VOID")
     p_settle.add_argument("--ref", required=True, help="external_ref of the placement")
@@ -131,6 +165,8 @@ def main(argv=None) -> int:
         return cmd_scan(cfg)
     if args.command == "run":
         return cmd_run(cfg)
+    if args.command == "watch":
+        return cmd_watch(cfg)
     if args.command == "report":
         return cmd_report(cfg)
     if args.command == "settle":

@@ -17,6 +17,7 @@ a live one. Any other configuration falls back to the paper executor.
 from __future__ import annotations
 
 import logging
+from concurrent.futures import ThreadPoolExecutor
 from typing import List, Optional, Tuple
 
 from .bankroll import BankrollManager
@@ -70,6 +71,9 @@ class ValueBettingBot:
             min_price=cfg.min_price,
             max_price=cfg.max_price,
             commission=commission,
+            edge_haircut=cfg.edge_haircut,
+            min_liquidity=cfg.min_liquidity,
+            max_overround=cfg.max_overround,
         )
         self.bankroll = BankrollManager(
             bankroll=cfg.bankroll,
@@ -82,6 +86,8 @@ class ValueBettingBot:
         self.store = BetStore(db_path=cfg.db_path, csv_path=cfg.csv_path)
         # A single Betfair session shared between the price source and executor.
         self._betfair: Optional[BetfairClient] = None
+        # Persistent executor reused across a continuous loop.
+        self._executor: Optional[Executor] = None
 
     # -- betfair session ---------------------------------------------------
     def _betfair_client(self) -> BetfairClient:
@@ -95,28 +101,34 @@ class ValueBettingBot:
         return self._betfair
 
     # -- truth source: Pinnacle -------------------------------------------
-    def _fair_lines(self) -> List[FairLine]:
+    def _fair_lines_for_sport(self, sport: str) -> List[FairLine]:
         src = self.cfg.pinnacle_source
-        lines: List[FairLine] = []
-        if src == "sample":
+        try:
+            if src == "the_odds_api":
+                return pinnacle_lines_via_odds_api(
+                    api_key=self.cfg.odds_api_key or "", sport_key=sport,
+                    regions=self.cfg.regions, devig_method=self.cfg.devig_method,
+                )
+            if src == "direct":
+                client = PinnacleClient(self.cfg.pinnacle_username or "",
+                                        self.cfg.pinnacle_password or "")
+                return client.fair_lines(sport, self.cfg.devig_method)
+            raise ValueError(f"unknown pinnacle_source {src!r}")
+        except Exception as exc:
+            log.error("pinnacle fetch failed for %s: %s", sport, exc)
+            return []
+
+    def _fair_lines(self) -> List[FairLine]:
+        if self.cfg.pinnacle_source == "sample":
             return sample_pinnacle_lines(self.cfg.pinnacle_sports[0])
-        for sport in self.cfg.pinnacle_sports:
-            try:
-                if src == "the_odds_api":
-                    lines.extend(pinnacle_lines_via_odds_api(
-                        api_key=self.cfg.odds_api_key or "", sport_key=sport,
-                        regions=self.cfg.regions, devig_method=self.cfg.devig_method,
-                    ))
-                elif src == "direct":
-                    client = PinnacleClient(
-                        self.cfg.pinnacle_username or "",
-                        self.cfg.pinnacle_password or "",
-                    )
-                    lines.extend(client.fair_lines(sport, self.cfg.devig_method))
-                else:
-                    raise ValueError(f"unknown pinnacle_source {src!r}")
-            except Exception as exc:
-                log.error("pinnacle fetch failed for %s: %s", sport, exc)
+        sports = self.cfg.pinnacle_sports
+        if len(sports) <= 1:
+            return self._fair_lines_for_sport(sports[0]) if sports else []
+        # Fetch sports concurrently to cut total latency near kickoff.
+        lines: List[FairLine] = []
+        with ThreadPoolExecutor(max_workers=min(8, len(sports))) as pool:
+            for res in pool.map(self._fair_lines_for_sport, sports):
+                lines.extend(res)
         return lines
 
     # -- venue source: Betfair --------------------------------------------
@@ -141,8 +153,13 @@ class ValueBettingBot:
     # -- board construction ------------------------------------------------
     def _boards(self) -> List[MarketBoard]:
         if self.cfg.mode == "pinnacle_betfair":
-            fair = self._fair_lines()
-            quotes = self._venue_quotes()
+            # Fetch the truth source (Pinnacle) and the venue (Betfair) in
+            # parallel — they're independent, so this halves fetch latency.
+            with ThreadPoolExecutor(max_workers=2) as pool:
+                fair_future = pool.submit(self._fair_lines)
+                quotes_future = pool.submit(self._venue_quotes)
+                fair = fair_future.result()
+                quotes = quotes_future.result()
             boards = EventMatcher(
                 min_team_score=self.cfg.match_min_team_score,
                 start_window_minutes=self.cfg.match_start_window_minutes,
@@ -169,8 +186,16 @@ class ValueBettingBot:
             self.cfg.executor == "betfair" and self.cfg.live) else None
         return build_executor(self.cfg, betfair_client=client)
 
+    def executor(self) -> Executor:
+        """A persistent executor, built once and reused across a long-running
+        loop (avoids re-login churn on the Betfair session)."""
+        if self._executor is None:
+            self._executor = self._build_executor()
+        return self._executor
+
     # -- identification only ----------------------------------------------
-    def scan(self) -> List[ValueBet]:
+    def evaluate(self) -> List[ValueBet]:
+        """Fetch fresh data, detect value and assign stakes. No placement."""
         from .value import ValueDetector
         boards = self._boards()
         bets = ValueDetector(**self.detector_kwargs).detect(boards)
@@ -179,27 +204,43 @@ class ValueBettingBot:
                  len(boards), len(bets), len(staked))
         return staked
 
-    # -- identify + place + log -------------------------------------------
-    def run(self) -> List[Tuple[ValueBet, PlacementResult]]:
-        bets = self.scan()
-        for bet in bets:
-            self.store.log_value_bet(bet)
+    # Backwards-compatible alias.
+    scan = evaluate
 
-        executor = self._build_executor()
+    def place_bets(self, bets: List[ValueBet], dedup: bool = True
+                   ) -> List[Tuple[ValueBet, PlacementResult]]:
+        """Log and place the given bets through the persistent executor,
+        skipping any opportunity already placed (so the continuous loop never
+        double-bets the same selection)."""
+        executor = self.executor()
         results: List[Tuple[ValueBet, PlacementResult]] = []
-        try:
-            for bet in bets:
-                result = executor.place(bet)
-                self.store.log_placement(result)
-                results.append((bet, result))
-                log.info("%s %s @ %.2f stake %.2f -> %s (%s)",
-                         bet.bookmaker, bet.selection, bet.price, bet.stake,
-                         result.status, result.message)
-        finally:
-            executor.close()
+        for bet in bets:
+            if dedup and self.store.already_placed(bet.key):
+                continue
+            self.store.log_value_bet(bet)
+            result = executor.place(bet)
+            self.store.log_placement(result, bet)
+            results.append((bet, result))
+            log.info("%s %s @ %.2f stake %.2f -> %s (%s)",
+                     bet.bookmaker, bet.selection, bet.price, bet.stake,
+                     result.status, result.message)
         return results
 
+    # -- identify + place + log (one-shot) --------------------------------
+    def run(self) -> List[Tuple[ValueBet, PlacementResult]]:
+        return self.place_bets(self.evaluate(), dedup=False)
+
+    def keep_alive(self) -> None:
+        if self._betfair is not None:
+            self._betfair.keep_alive()
+
     def close(self) -> None:
+        if self._executor is not None:
+            try:
+                self._executor.close()
+            except Exception:
+                pass
+            self._executor = None
         if self._betfair is not None:
             self._betfair.close()
         self.store.close()

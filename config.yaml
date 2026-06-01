@@ -13,7 +13,8 @@ pinnacle_source: sample        # sample | the_odds_api | direct
 pinnacle_sports:
   - soccer_epl                 # odds-api sport key (the_odds_api/sample);
                                # use "soccer" etc. for pinnacle_source: direct
-devig_method: multiplicative   # multiplicative | additive | shin
+devig_method: power            # power | shin | multiplicative | additive
+                               # power/shin correct favourite-longshot bias best
 
 # === betting venue: Betfair Exchange ===
 venue_source: sample           # sample | betfair
@@ -29,9 +30,18 @@ match_start_window_minutes: 90 # max kickoff-time difference to pair an event
 # === value detection ===
 reference_books:
   - pinnacle
-min_edge: 0.02                 # require >= 2% overlay AFTER commission
+min_edge: 0.02                 # require >= 2% overlay AFTER commission + haircut
 min_price: 1.30
 max_price: 15.0
+edge_haircut: 0.01             # subtract from edge for estimation error/slippage
+min_liquidity: 10.0            # min money (in stake currency) available to back
+max_overround: 1.15            # skip Pinnacle markets wider than this booksum
+
+# === continuous / near-kickoff scheduling (used by `run.py watch`) ===
+poll_interval_seconds: 60      # cadence when nothing is near kickoff
+refresh_interval_seconds: 5    # cadence when an event is inside its place window
+place_window_minutes: 3        # start placing this long before kickoff (sharp line)
+min_seconds_before_start: 20   # stop placing this close to kickoff (avoid in-play)
 
 # === staking / bankroll ===
 bankroll: 1000.0

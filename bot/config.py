@@ -46,10 +46,19 @@ class Config:
 
     # --- value detection ---
     reference_books: List[str] = field(default_factory=lambda: ["pinnacle"])
-    devig_method: str = "multiplicative"  # multiplicative | additive | shin
+    devig_method: str = "power"        # multiplicative | additive | shin | power
     min_edge: float = 0.02
     min_price: float = 1.30
     max_price: float = 15.0
+    edge_haircut: float = 0.01         # conservative edge cut for estimation error
+    min_liquidity: float = 10.0        # min money available to back at the venue
+    max_overround: float = 1.15        # skip Pinnacle markets wider than this booksum
+
+    # --- continuous / near-kickoff scheduling ---
+    poll_interval_seconds: float = 60.0     # cadence when nothing is near kickoff
+    refresh_interval_seconds: float = 5.0   # cadence when an event is in-window
+    place_window_minutes: float = 3.0       # start betting this long before kickoff
+    min_seconds_before_start: float = 20.0  # stop betting this close to kickoff
 
     # --- staking / bankroll ---
     bankroll: float = 1000.0

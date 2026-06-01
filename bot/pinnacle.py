@@ -149,6 +149,7 @@ def pinnacle_lines_via_odds_api(
                 commence_time=board.commence_time, home_team=board.home_team,
                 away_team=board.away_team, market="h2h",
                 probs=dict(zip(names, probs)), source="pinnacle",
+                last_update=pin.last_update,
             )
         )
     return lines

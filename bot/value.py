@@ -43,12 +43,14 @@ def _fair_probs(
     board: MarketBoard,
     reference_books: List[str],
     method: str,
-) -> Optional[dict]:
-    """Return {selection: fair_prob} from the first available reference book,
-    else from the de-vigged consensus across all books. None if unusable."""
+):
+    """Return ``(probs, overround)`` where ``probs`` is {selection: fair_prob}
+    from the first available reference book (else the de-vigged consensus) and
+    ``overround`` is the booksum of the source used (a market-quality signal).
+    Returns None if unusable."""
     selections = board.selections()
 
-    def from_book(book) -> Optional[dict]:
+    def from_book(book):
         odds = [book.price_for(s) for s in selections]
         if any(o is None for o in odds):
             return None
@@ -56,7 +58,7 @@ def _fair_probs(
             fair = devig(odds, method=method)
         except ValueError:
             return None
-        return dict(zip(selections, fair))
+        return dict(zip(selections, fair)), sum(1.0 / o for o in odds)
 
     by_name = {b.bookmaker.lower(): b for b in board.books}
     for ref in reference_books:
@@ -69,20 +71,21 @@ def _fair_probs(
     # Consensus fallback: average de-vigged probability across every book that
     # quotes the full set of selections.
     per_selection: dict = {s: [] for s in selections}
-    used = 0
+    overrounds: list = []
     for book in board.books:
         res = from_book(book)
         if res:
-            used += 1
-            for s, p in res.items():
+            probs, over = res
+            overrounds.append(over)
+            for s, p in probs.items():
                 per_selection[s].append(p)
-    if used == 0:
+    if not overrounds:
         return None
     consensus = {s: statistics.mean(v) for s, v in per_selection.items() if v}
     total = sum(consensus.values())
     if total <= 0:
         return None
-    return {s: p / total for s, p in consensus.items()}
+    return {s: p / total for s, p in consensus.items()}, statistics.mean(overrounds)
 
 
 class ValueDetector:
@@ -97,6 +100,9 @@ class ValueDetector:
         max_price: float = 15.0,
         exclude_books: Optional[List[str]] = None,
         commission: float = 0.0,
+        edge_haircut: float = 0.0,
+        min_liquidity: float = 0.0,
+        max_overround: float = 1.20,
     ):
         # Reference (sharp) books in priority order.
         self.reference_books = reference_books or ["pinnacle"]
@@ -108,6 +114,15 @@ class ValueDetector:
         # ~2-5%). The edge/EV/Kelly are computed on the commission-adjusted
         # ("effective") price so the bot only bets when value survives the rake.
         self.commission = commission
+        # Conservative absolute haircut subtracted from the measured edge to
+        # account for fair-price estimation error and execution slippage. This
+        # raises accuracy by filtering thin, likely-spurious "value".
+        self.edge_haircut = edge_haircut
+        # Skip venue prices with less than this much money available to back.
+        self.min_liquidity = min_liquidity
+        # Skip reference markets whose booksum exceeds this (too wide a margin
+        # signals an early/illiquid line that is a poor truth estimate).
+        self.max_overround = max_overround
         # Never flag the reference book against itself.
         self.exclude_books = {b.lower() for b in (exclude_books or [])}
         self.exclude_books |= {b.lower() for b in self.reference_books}
@@ -120,8 +135,12 @@ class ValueDetector:
         return 1.0 + (price - 1.0) * (1.0 - self.commission)
 
     def detect_board(self, board: MarketBoard) -> List[ValueBet]:
-        fair = _fair_probs(board, self.reference_books, self.devig_method)
-        if not fair:
+        result = _fair_probs(board, self.reference_books, self.devig_method)
+        if not result:
+            return []
+        fair, overround = result
+        # Reject markets whose reference line is too wide to trust.
+        if overround > self.max_overround:
             return []
 
         found: List[ValueBet] = []
@@ -135,11 +154,17 @@ class ValueDetector:
                 price = outcome.price
                 if price < self.min_price or price > self.max_price:
                     continue
+                # Liquidity filter: only bet where there's enough money to back.
+                if (self.min_liquidity > 0 and outcome.size is not None
+                        and outcome.size < self.min_liquidity):
+                    continue
                 eff_price = self._effective_price(price)
                 fair_price = 1.0 / p
-                # Edge and EV are measured on the commission-adjusted price.
+                # Edge and EV are measured on the commission-adjusted price, then
+                # cut by a conservative haircut before the threshold test.
                 edge = eff_price / fair_price - 1.0
-                if edge < self.min_edge:
+                net_edge = edge - self.edge_haircut
+                if net_edge < self.min_edge:
                     continue
                 ev = expected_value(p, eff_price)
                 if ev <= 0:
@@ -156,13 +181,17 @@ class ValueDetector:
                         price=price,
                         fair_prob=p,
                         fair_price=fair_price,
-                        edge=edge,
+                        edge=net_edge,
                         ev=ev,
-                        kelly_fraction=kelly_fraction(p, eff_price),
+                        # Size Kelly on the haircut-adjusted probability so stakes
+                        # stay conservative relative to estimation uncertainty.
+                        kelly_fraction=kelly_fraction(p / (1.0 + self.edge_haircut),
+                                                      eff_price),
                         commission=self.commission,
                         eff_price=eff_price,
                         venue_market_id=book.market_id,
                         venue_selection_id=outcome.selection_id,
+                        available_size=outcome.size,
                     )
                 )
         return found

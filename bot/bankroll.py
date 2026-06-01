@@ -48,6 +48,10 @@ class BankrollManager:
         frac = min(frac, self.max_fraction_per_bet)
         stake = frac * self.bankroll
         stake = min(stake, self.max_stake)
+        # Never stake more than is available to back at the venue price: a
+        # larger order would partially fill at worse prices and erode the edge.
+        if bet.available_size is not None:
+            stake = min(stake, bet.available_size)
         if stake < self.min_stake:
             return 0.0
         return self._round(stake)

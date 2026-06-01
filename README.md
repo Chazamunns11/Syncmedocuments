@@ -46,8 +46,9 @@ The bot **cannot place a real bet** unless you explicitly set `live: true`,
 pip install -r requirements.txt        # not needed for the offline/paper demo
 
 python run.py scan       # identify value bets (offline sample data)
-python run.py run        # identify, place (paper) and log
-python run.py report     # logged bets + running P&L
+python run.py run        # identify, place (paper) and log — one shot
+python run.py watch      # run CONTINUOUSLY, placing each bet near kickoff
+python run.py report     # logged bets + running P&L + edge + CLV
 python run.py settle --ref paper-xxxx --result WON   # settle a finished bet
 ```
 
@@ -84,8 +85,55 @@ survives Betfair's rake (`betfair_commission`, UK base 5%).
 
 ### Why a sharp reference?
 Pinnacle prices near true probability and accepts big bets, so its de-vigged line
-is the cheapest good estimate of "truth". De-vig methods: `multiplicative`
-(default), `additive`, `shin` (favourite–longshot aware) — see `bot/devig.py`.
+is the cheapest good estimate of "truth". De-vig methods: `power` (default) and
+`shin` both correct favourite–longshot bias and are the most accurate;
+`multiplicative` and `additive` are simpler baselines — see `bot/devig.py`.
+
+## Continuous operation, timed to kickoff (`run.py watch`)
+
+The single biggest accuracy lever is **when** you bet: the line is sharpest right
+before the off. `watch` runs forever and, every cycle:
+
+1. re-evaluates value with **fresh** data,
+2. places only bets whose event starts within `place_window_minutes` (and hasn't
+   started) — so it always acts on the latest, sharpest prices,
+3. **sleeps adaptively** — `poll_interval_seconds` when nothing is near kickoff,
+   tightening to `refresh_interval_seconds` once an event enters its window — to
+   minimise both API load and the lag between pricing and placement,
+4. keeps the Betfair session alive and **never double-bets** the same selection.
+
+```bash
+python run.py watch        # Ctrl-C to stop
+```
+
+Tune `place_window_minutes` (how close to kickoff to fire) and
+`min_seconds_before_start` (stop before in-play turns the market over).
+
+## What makes it accurate
+
+| Lever | Where | Effect |
+|-------|-------|--------|
+| **Power / Shin de-vig** | `bot/devig.py` | Better fair-probability estimate (favourite–longshot bias corrected). |
+| **Commission-adjusted EV** | `bot/value.py` | Only bets when value survives Betfair's rake. |
+| **Edge haircut** | `edge_haircut` | Conservative cut for estimation error + slippage; filters thin/spurious value. |
+| **Overround band** | `max_overround` | Skips wide, early/illiquid Pinnacle lines that are poor truth estimates. |
+| **Liquidity filter + stake cap** | `min_liquidity`, bankroll | Won't bet into thin markets; caps stake to money actually available, so you don't fill at worse prices. |
+| **Near-kickoff timing** | `bot/scheduler.py` | Bets on the sharpest line of the day. |
+| **CLV tracking** | `store.record_closing()` | Closing Line Value — the best predictor of long-term edge. `report` shows avg CLV and beat-rate. |
+
+**Speed:** Pinnacle and Betfair are fetched concurrently; multiple sports fetch
+in parallel; the Betfair catalogue is cached so near-kickoff cycles only re-pull
+prices (`refresh_prices`), not the full market list; the session is kept alive
+to avoid re-login churn.
+
+### Measuring real edge: CLV
+After an event starts, record the closing fair price to see if you beat the
+close — positive CLV across many bets is the strongest sign the bot has a real
+edge (independent of short-run win/loss variance):
+
+```python
+bot.store.record_closing(external_ref, closing_fair_price)  # clv = taken/closing - 1
+```
 
 ## Going live (real money on Betfair)
 
@@ -124,9 +172,10 @@ environment (`.env`). Key settings: `mode`, `pinnacle_source`, `venue_source`,
 python -m unittest discover -s tests -v
 ```
 
-31 tests: de-vig math, Kelly/EV, commission-adjusted value, the Betfair price
-ladder, event matching, bankroll caps, paper executor, store + settlement, the
-live-money safety gate, and full paper pipelines for both modes.
+42 tests: de-vig math (incl. power), Kelly/EV, commission-adjusted value, the
+edge haircut / liquidity / overround filters, liquidity stake cap, the Betfair
+price ladder, event matching, the continuous scheduler (window + dedup), store +
+settlement + CLV, the live-money safety gate, and full paper pipelines.
 
 ## Modes
 
@@ -143,13 +192,14 @@ bot/
   pinnacle.py        Pinnacle truth source (direct API + via The Odds API)
   betfair_client.py  shared Betfair session: prices + placement + price ladder
   matcher.py         pair Pinnacle <-> Betfair events, align runners -> boards
-  value.py           ValueDetector + Kelly/EV (commission-aware)
-  bankroll.py        stake sizing & exposure caps
+  value.py           ValueDetector + Kelly/EV (commission/haircut/liquidity-aware)
+  bankroll.py        stake sizing & exposure caps (+ liquidity cap)
+  scheduler.py       continuous near-kickoff runner (adaptive polling + dedup)
   samples.py         offline sample Pinnacle lines + Betfair quotes
   providers/         multi_book feeds: sample + the_odds_api
   execution/         paper (default) + betfair (real exchange)
-  store.py           SQLite + CSV logging, settlement, P&L summary
-  bot.py             orchestration + live-money safety gate
-run.py               CLI: scan | run | report | settle
+  store.py           SQLite + CSV logging, settlement, P&L + CLV
+  bot.py             orchestration (concurrent fetch) + live-money safety gate
+run.py               CLI: scan | run | watch | report | settle
 tests/               unit + end-to-end tests
 ```

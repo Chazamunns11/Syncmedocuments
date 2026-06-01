@@ -96,6 +96,7 @@ class ValueBet:
     eff_price: Optional[float] = None  # commission-adjusted decimal odds used for EV
     venue_market_id: Optional[str] = None
     venue_selection_id: Optional[str] = None
+    available_size: Optional[float] = None  # liquidity available at the venue price
     identified_at: str = field(default_factory=utcnow_iso)
 
     @property
@@ -144,6 +145,7 @@ class FairLine:
     market: str
     probs: Dict[str, float] = field(default_factory=dict)
     source: str = "pinnacle"
+    last_update: Optional[str] = None  # ISO timestamp of the underlying line
 
     def fair_price(self, selection: str) -> Optional[float]:
         p = self.probs.get(selection)

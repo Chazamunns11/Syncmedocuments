@@ -23,7 +23,7 @@ import math
 from typing import List
 
 Method = str
-SUPPORTED_METHODS = ("multiplicative", "additive", "shin")
+SUPPORTED_METHODS = ("multiplicative", "additive", "shin", "power")
 
 
 def _validate(odds: List[float]) -> None:
@@ -96,6 +96,39 @@ def shin(odds: List[float], max_iter: int = 100, tol: float = 1e-12) -> List[flo
     return [x / total for x in p]
 
 
+def power(odds: List[float], max_iter: int = 100, tol: float = 1e-12) -> List[float]:
+    """Power (logarithmic) method. Models fair probability as p_i = q_i**k where
+    q_i = 1/odds_i, solving for the exponent k so that the probabilities sum to
+    1. Like Shin, it corrects favourite-longshot bias (shrinking favourites more
+    than naive normalisation), and is widely regarded as one of the more accurate
+    de-vig methods for two- and three-way markets."""
+    _validate(odds)
+    q = implied(odds)
+    if sum(q) <= 1.0:  # no margin
+        return multiplicative(odds)
+
+    def total_for(k: float) -> float:
+        return sum(qi ** k for qi in q)
+
+    # sum(q_i**k) is monotone decreasing in k for q_i<1; root lies at k>1.
+    lo, hi = 1.0, 1.0
+    while total_for(hi) > 1.0 and hi < 1e6:
+        hi *= 2.0
+    for _ in range(max_iter):
+        mid = 0.5 * (lo + hi)
+        s = total_for(mid)
+        if abs(s - 1.0) < tol:
+            break
+        if s > 1.0:
+            lo = mid
+        else:
+            hi = mid
+    k = 0.5 * (lo + hi)
+    p = [qi ** k for qi in q]
+    total = sum(p)
+    return [x / total for x in p]
+
+
 def devig(odds: List[float], method: Method = "multiplicative") -> List[float]:
     """Dispatch to the requested de-vig method."""
     if method == "multiplicative":
@@ -104,6 +137,8 @@ def devig(odds: List[float], method: Method = "multiplicative") -> List[float]:
         return additive(odds)
     if method == "shin":
         return shin(odds)
+    if method == "power":
+        return power(odds)
     raise ValueError(
         f"unknown de-vig method {method!r}; choose one of {SUPPORTED_METHODS}"
     )
