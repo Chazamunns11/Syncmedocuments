@@ -5,7 +5,7 @@ import unittest
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from bot.backtest import (_discover_books, run_backtest, synthetic_rows,
-                          format_result)
+                          format_result, sweep, format_sweep)
 
 
 class TestDiscoverBooks(unittest.TestCase):
@@ -54,6 +54,25 @@ class TestBacktest(unittest.TestCase):
     def test_format_runs(self):
         res = run_backtest(synthetic_rows(200), flat_stake=5.0)
         self.assertIn("Backtest result", format_result(res))
+
+    def test_edge_buckets_populated(self):
+        res = run_backtest(synthetic_rows(2000, edge=0.04), min_edge=0.01,
+                           flat_stake=10.0)
+        self.assertTrue(res.buckets)
+        # Every bucket's bets sum to the total.
+        self.assertEqual(sum(b["bets"] for b in res.buckets.values()), res.bets)
+
+
+class TestSweep(unittest.TestCase):
+    def test_sweep_ranks_by_clv(self):
+        rows = synthetic_rows(n=1500, edge=0.04, seed=9)
+        ranked = sweep(rows, grid={
+            "method": ["weighted"], "min_edge": [0.02, 0.04],
+            "devig_method": ["power"], "consensus_alpha": [0.05]})
+        self.assertTrue(ranked)
+        clvs = [r.avg_clv for _, r in ranked if r.avg_clv is not None]
+        self.assertEqual(clvs, sorted(clvs, reverse=True))  # best-first
+        self.assertIn("sweep", format_sweep(ranked).lower())
 
 
 if __name__ == "__main__":

@@ -139,7 +139,7 @@ def cmd_go(cfg: Config, args) -> int:
 def cmd_backtest(cfg: Config, args) -> int:
     """Validate the strategy on historical data before risking money."""
     from bot.backtest import (load_football_data, run_backtest, format_result,
-                              synthetic_rows)
+                              synthetic_rows, sweep, format_sweep)
     if args.data:
         rows = load_football_data(args.data)
         print(f"Loaded {len(rows)} historical matches from {len(args.data)} path(s).")
@@ -150,6 +150,10 @@ def cmd_backtest(cfg: Config, args) -> int:
     if not rows:
         print("No usable rows found.")
         return 1
+    if args.sweep:
+        print("Sweeping parameters to find the most profitable configuration...")
+        print(format_sweep(sweep(rows)))
+        return 0
     res = run_backtest(
         rows, method=cfg.truth_model if cfg.truth_model in ("weighted", "consensus")
         else "weighted",
@@ -277,6 +281,8 @@ def main(argv=None) -> int:
                       help="flat stake per bet (0 = use Kelly)")
     p_bt.add_argument("--synthetic", type=int, default=400,
                       help="number of synthetic matches if no --data")
+    p_bt.add_argument("--sweep", action="store_true",
+                      help="grid-search parameters and rank by CLV/yield")
     sub.add_parser("report", help="show logged placements and P&L")
     sub.add_parser("status", help="dashboard: bankroll, exposure, risk, CLV")
     p_settle = sub.add_parser("settle", help="mark a placed bet WON/LOST/VOID")

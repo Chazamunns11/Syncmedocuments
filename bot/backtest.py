@@ -110,6 +110,17 @@ class BacktestResult:
     starting_bankroll: float = 0.0
     equity_curve: List[float] = field(default_factory=list)
     skipped_no_books: int = 0
+    buckets: dict = field(default_factory=dict)  # edge bucket -> stats
+
+
+_BUCKETS = [(0.0, 0.02), (0.02, 0.04), (0.04, 0.06), (0.06, 0.10), (0.10, 1e9)]
+
+
+def _bucket_label(edge: float) -> str:
+    for lo, hi in _BUCKETS:
+        if lo <= edge < hi:
+            return f"{lo*100:.0f}-{hi*100:.0f}%" if hi < 1e9 else f"{lo*100:.0f}%+"
+    return "?"
 
 
 def run_backtest(
@@ -213,6 +224,17 @@ def run_backtest(
         res.wins += 1 if win else 0
         edges.append(bet.edge)
         odds_list.append(bet.price)
+        # Per-edge-bucket breakdown (where does the edge actually live?).
+        b = res.buckets.setdefault(_bucket_label(bet.edge),
+                                   {"bets": 0, "staked": 0.0, "profit": 0.0,
+                                    "clv_sum": 0.0, "clv_n": 0, "clv_pos": 0})
+        b["bets"] += 1
+        b["staked"] += stake
+        b["profit"] += profit
+        if clv is not None:
+            b["clv_sum"] += clv
+            b["clv_n"] += 1
+            b["clv_pos"] += 1 if clv > 0 else 0
         running += profit
         peak = max(peak, running)
         res.max_drawdown = max(res.max_drawdown, peak - running)
@@ -250,6 +272,55 @@ def format_result(r: BacktestResult) -> str:
     ]
     if r.skipped_no_books:
         lines.append(f"  (skipped {r.skipped_no_books} rows with too few books)")
+    if r.buckets:
+        lines.append("  by taken-value bucket:")
+        for label, _ in [(f"{lo*100:.0f}-{hi*100:.0f}%" if hi < 1e9
+                          else f"{lo*100:.0f}%+", None) for lo, hi in _BUCKETS]:
+            b = r.buckets.get(label)
+            if not b:
+                continue
+            y = b["profit"] / b["staked"] * 100 if b["staked"] else 0.0
+            clv = (b["clv_sum"] / b["clv_n"] * 100) if b["clv_n"] else 0.0
+            lines.append(f"    {label:>7}: {b['bets']:5d} bets  "
+                         f"yield {y:+6.2f}%  CLV {clv:+6.2f}%")
+    return "\n".join(lines)
+
+
+def sweep(rows: List[dict], grid: Optional[dict] = None, top: int = 8) -> List:
+    """Grid-search strategy parameters on historical data and rank by average
+    CLV then yield. Returns a list of (params, BacktestResult) best-first — so you
+    can pick the most robust, highest-edge configuration before going live."""
+    import itertools
+
+    grid = grid or {
+        "method": ["weighted", "kaunitz"],
+        "min_edge": [0.01, 0.02, 0.03, 0.04],
+        "devig_method": ["power", "shin"],
+        "consensus_alpha": [0.03, 0.05, 0.07],
+    }
+    keys = list(grid)
+    results = []
+    for combo in itertools.product(*(grid[k] for k in keys)):
+        params = dict(zip(keys, combo))
+        res = run_backtest(rows, flat_stake=1.0, **params)
+        if res.bets >= 20:  # ignore configs with too few bets to be meaningful
+            results.append((params, res))
+
+    def score(item):
+        _, r = item
+        return (r.avg_clv if r.avg_clv is not None else -1, r.yield_pct)
+
+    results.sort(key=score, reverse=True)
+    return results[:top]
+
+
+def format_sweep(ranked: List) -> str:
+    lines = ["=== Parameter sweep (best by CLV, then yield) ==="]
+    for params, r in ranked:
+        p = " ".join(f"{k}={v}" for k, v in params.items())
+        clv = f"{r.avg_clv*100:+.2f}%" if r.avg_clv is not None else "n/a"
+        lines.append(f"  CLV {clv:>7}  yield {r.yield_pct:+6.2f}%  "
+                     f"bets {r.bets:5d}  | {p}")
     return "\n".join(lines)
 
 
