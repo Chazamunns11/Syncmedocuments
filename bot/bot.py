@@ -30,6 +30,7 @@ from .matcher import EventMatcher
 from .models import FairLine, MarketBoard, PlacementResult, ValueBet, VenueQuote
 from .pinnacle import PinnacleClient, pinnacle_lines_via_odds_api
 from .providers import SampleProvider, TheOddsAPIProvider
+from .risk import RiskLimits, RiskManager
 from .samples import (sample_betfair_quotes, sample_multibook_boards,
                       sample_pinnacle_lines)
 from .store import BetStore
@@ -126,6 +127,18 @@ class ValueBettingBot:
             flat_stake=cfg.flat_stake,
         )
         self.store = BetStore(db_path=cfg.db_path, csv_path=cfg.csv_path)
+        self.risk = RiskManager(RiskLimits(
+            starting_bankroll=cfg.bankroll,
+            daily_stake_limit_fraction=cfg.daily_stake_limit_fraction,
+            max_open_bets=cfg.max_open_bets,
+            max_open_exposure_fraction=cfg.max_open_exposure_fraction,
+            max_bets_per_day=cfg.max_bets_per_day,
+            stop_loss_fraction=cfg.stop_loss_fraction,
+            min_bankroll_fraction=cfg.min_bankroll_fraction,
+        ), self.store)
+        # Compound the working bankroll with realised P&L from prior runs.
+        if cfg.compound_bankroll:
+            self.refresh_bankroll()
         # Latest matched boards, kept so CLV can be captured at kickoff.
         self._last_boards: List[MarketBoard] = []
         # A single Betfair session shared between the price source and executor.
@@ -293,10 +306,21 @@ class ValueBettingBot:
         executor = self.executor()
         results: List[Tuple[ValueBet, PlacementResult]] = []
         placed_events = set()
+        # Circuit breakers: if a global limit is hit, place nothing this cycle.
+        ok, reason = self.risk.status(self.bankroll.bankroll)
+        if not ok:
+            log.warning("RISK HALT: %s — no bets placed", reason)
+            return results
         for bet in bets:
             if dedup and (bet.event_id in placed_events
                           or self.store.already_placed_event(bet.event_id)):
                 continue
+            # Cap the stake to remaining daily and open-exposure budgets.
+            capped = self.risk.cap_stake(bet.stake, self.bankroll.bankroll)
+            if capped < self.cfg.min_stake:
+                log.info("skipping %s: risk budget exhausted", bet.selection)
+                continue
+            bet.stake = round(capped, 2)
             self.store.log_value_bet(bet)
             result = executor.place(bet)
             self.store.log_placement(result, bet)

@@ -86,6 +86,15 @@ class Config:
     min_stake: float = 1.0
     max_stake: float = 100.0
     max_total_exposure_fraction: float = 0.10
+    compound_bankroll: bool = True      # grow/shrink the bank with realised P&L
+
+    # --- risk management / circuit breakers ---
+    daily_stake_limit_fraction: float = 0.25   # max staked per day vs bankroll
+    max_open_bets: int = 25                     # max simultaneous open positions
+    max_open_exposure_fraction: float = 0.25    # max unsettled stake vs bankroll
+    max_bets_per_day: int = 200
+    stop_loss_fraction: float = 0.30            # halt if drawdown from peak exceeds
+    min_bankroll_fraction: float = 0.50         # halt if bankroll below this fraction
 
     # --- execution ---
     executor: str = "paper"            # "paper" | "betfair"

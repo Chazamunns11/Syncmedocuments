@@ -62,6 +62,10 @@ CREATE TABLE IF NOT EXISTS placements (
 CREATE INDEX IF NOT EXISTS idx_placements_ref ON placements(external_ref);
 CREATE INDEX IF NOT EXISTS idx_placements_key ON placements(bet_key);
 CREATE INDEX IF NOT EXISTS idx_placements_event ON placements(event_id);
+CREATE TABLE IF NOT EXISTS meta (
+    key TEXT PRIMARY KEY,
+    value REAL
+);
 """
 
 # Columns added after the first release; ensured on every open for old DBs.
@@ -316,6 +320,24 @@ class BetStore:
             (iso_time,)).fetchone()
         return float(row["s"] or 0.0)
 
+    def count_since(self, iso_time: str) -> int:
+        """Number of placements since an ISO timestamp (for daily count caps)."""
+        row = self._conn.execute(
+            "SELECT COUNT(*) AS n FROM placements WHERE placed_at >= ? "
+            "AND status IN ('PLACED','MATCHED','DRY_RUN')", (iso_time,)).fetchone()
+        return int(row["n"] or 0)
+
+    # -- small key/value state (peak bankroll, etc.) ----------------------
+    def get_meta(self, key: str, default: float = 0.0) -> float:
+        row = self._conn.execute("SELECT value FROM meta WHERE key=?", (key,)).fetchone()
+        return float(row["value"]) if row else default
+
+    def set_meta(self, key: str, value: float) -> None:
+        self._conn.execute(
+            "INSERT INTO meta(key,value) VALUES(?,?) "
+            "ON CONFLICT(key) DO UPDATE SET value=excluded.value", (key, value))
+        self._conn.commit()
+
     def count_open(self) -> int:
         """Placements not yet settled (open exposure positions)."""
         row = self._conn.execute(
@@ -323,6 +345,14 @@ class BetStore:
             "WHERE settlement='PENDING' AND status IN ('PLACED','MATCHED')"
         ).fetchone()
         return int(row["n"] or 0)
+
+    def open_exposure(self) -> float:
+        """Total staked on placements not yet settled (money at risk)."""
+        row = self._conn.execute(
+            "SELECT COALESCE(SUM(requested_stake),0) AS s FROM placements "
+            "WHERE settlement='PENDING' AND status IN ('PLACED','MATCHED')"
+        ).fetchone()
+        return float(row["s"] or 0.0)
 
     def close(self) -> None:
         self._conn.close()
