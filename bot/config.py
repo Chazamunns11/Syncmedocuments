@@ -111,9 +111,10 @@ class Config:
     paper_fill_probability: float = 1.0
     betfair_dry_run: bool = True
 
-    # --- storage ---
+    # --- storage / logging ---
     db_path: str = "bets.db"
     csv_path: str = "bets.csv"
+    log_file: Optional[str] = None      # also write logs here (for overnight runs)
 
     # --- secrets (env only) ---
     odds_api_key: Optional[str] = None
@@ -140,6 +141,43 @@ class Config:
         cfg = cls(**clean)
         cfg._apply_env()
         return cfg
+
+    def validate(self) -> List[str]:
+        """Return a list of human-readable problems/warnings. Errors (which make
+        live betting unsafe) are prefixed 'ERROR:'."""
+        msgs: List[str] = []
+        if self.bankroll <= 0:
+            msgs.append("ERROR: bankroll must be positive")
+        if not (0 < self.kelly_multiplier <= 1):
+            msgs.append("ERROR: kelly_multiplier must be in (0, 1]")
+        if self.min_edge < 0:
+            msgs.append("ERROR: min_edge must be >= 0")
+        if not (0 <= self.betfair_commission < 0.5):
+            msgs.append("ERROR: betfair_commission must be in [0, 0.5)")
+        if self.flat_stake is not None and self.flat_stake <= 0:
+            msgs.append("ERROR: flat_stake must be positive if set")
+        if self.max_stake < self.min_stake:
+            msgs.append("ERROR: max_stake < min_stake")
+        if self.min_expected_clv < 0:
+            msgs.append("WARNING: min_expected_clv < 0 allows -CLV bets")
+        if self.min_edge < 0.01:
+            msgs.append("WARNING: min_edge < 1% — edges this thin rarely survive "
+                        "commission and variance")
+        if self.kelly_multiplier > 0.5 and self.flat_stake is None:
+            msgs.append("WARNING: Kelly fraction > 0.5 is aggressive; 0.15-0.25 "
+                        "is the practitioner range")
+        # Live-money readiness.
+        if self.live and self.executor == "betfair":
+            if not (self.betfair_username and self.betfair_password
+                    and self.betfair_app_key):
+                msgs.append("ERROR: live Betfair betting needs BETFAIR_USERNAME/"
+                            "PASSWORD/APP_KEY in the environment")
+            if self.venue_source != "betfair":
+                msgs.append("WARNING: live but venue_source != 'betfair'")
+            if self.truth_model != "pinnacle" and self.pinnacle_source == "sample":
+                msgs.append("WARNING: live but using SAMPLE data — set "
+                            "pinnacle_source to the_odds_api")
+        return msgs
 
     def _apply_env(self) -> None:
         self.odds_api_key = os.getenv("ODDS_API_KEY", self.odds_api_key)

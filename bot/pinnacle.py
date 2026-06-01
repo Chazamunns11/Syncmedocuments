@@ -70,25 +70,21 @@ class PinnacleClient:
         self.timeout = timeout
 
     def fair_lines(self, sport: str, devig_method: str = "multiplicative") -> List[FairLine]:
-        import requests
+        from .http import get_json
 
         sport_id = PINNACLE_SPORT_IDS.get(sport)
         if sport_id is None:
             raise ValueError(f"unknown Pinnacle sport {sport!r}")
         auth = (self.username, self.password)
 
-        fixtures = requests.get(
+        fixtures, _ = get_json(
             f"{PINNACLE_API_ROOT}/v1/fixtures",
-            params={"sportId": sport_id}, auth=auth, timeout=self.timeout,
-        )
-        fixtures.raise_for_status()
-        odds = requests.get(
+            params={"sportId": sport_id}, auth=auth, timeout=self.timeout)
+        odds, _ = get_json(
             f"{PINNACLE_API_ROOT}/v1/odds",
             params={"sportId": sport_id, "oddsFormat": "Decimal"},
-            auth=auth, timeout=self.timeout,
-        )
-        odds.raise_for_status()
-        return self._join(fixtures.json(), odds.json(), sport, devig_method)
+            auth=auth, timeout=self.timeout)
+        return self._join(fixtures, odds, sport, devig_method)
 
     @staticmethod
     def _join(fixtures_json, odds_json, sport, method) -> List[FairLine]:

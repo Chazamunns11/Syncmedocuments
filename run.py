@@ -163,6 +163,42 @@ def cmd_backtest(cfg: Config, args) -> int:
     return 0
 
 
+def cmd_status(cfg: Config) -> int:
+    """Live dashboard: bankroll, exposure, today's activity, risk state, CLV."""
+    bot = ValueBettingBot(cfg)
+    try:
+        store = bot.store
+        bankroll = bot.bankroll.bankroll
+        peak = store.get_meta("peak_bankroll", cfg.bankroll)
+        realised = store.realised_profit()
+        ok, reason = bot.risk.status(bankroll)
+        import datetime as _dt
+        day = _dt.datetime.now(_dt.timezone.utc).replace(
+            hour=0, minute=0, second=0, microsecond=0).isoformat()
+        s = store.summary()
+        print("\n=== Bot status ===")
+        print(f"  bankroll:       {_fmt_money(bankroll)} "
+              f"(start {_fmt_money(cfg.bankroll)}, realised {_fmt_money(realised)})")
+        dd = (peak - bankroll) / peak * 100 if peak > 0 else 0.0
+        print(f"  peak / drawdown:{_fmt_money(peak)} / {dd:.1f}%")
+        print(f"  open positions: {store.count_open()}  "
+              f"exposure {_fmt_money(store.open_exposure())}")
+        print(f"  today:          {store.count_since(day)} bets, "
+              f"{_fmt_money(store.staked_since(day))} staked")
+        print(f"  risk state:     {'OK — betting enabled' if ok else 'HALTED: ' + reason}")
+        print(f"  lifetime:       {s['n']} bets, P&L {_fmt_money(s['profit'])}, "
+              f"ROI {s['roi']*100:+.2f}%")
+        if s["clv_mkt_n"]:
+            print(f"  CLV vs market:  avg {(s['avg_clv_market'] or 0)*100:+.2f}%  "
+                  f"beat {s['clv_mkt_beat']}/{s['clv_mkt_n']}")
+        elif s["clv_n"]:
+            print(f"  CLV vs model:   avg {(s['avg_clv'] or 0)*100:+.2f}%  "
+                  f"beat {s['clv_beat']}/{s['clv_n']}")
+        return 0
+    finally:
+        bot.close()
+
+
 def cmd_report(cfg: Config) -> int:
     bot = ValueBettingBot(cfg)
     try:
@@ -242,16 +278,30 @@ def main(argv=None) -> int:
     p_bt.add_argument("--synthetic", type=int, default=400,
                       help="number of synthetic matches if no --data")
     sub.add_parser("report", help="show logged placements and P&L")
+    sub.add_parser("status", help="dashboard: bankroll, exposure, risk, CLV")
     p_settle = sub.add_parser("settle", help="mark a placed bet WON/LOST/VOID")
     p_settle.add_argument("--ref", required=True, help="external_ref of the placement")
     p_settle.add_argument("--result", required=True, choices=["WON", "LOST", "VOID"])
 
     args = parser.parse_args(argv)
+    handlers = [logging.StreamHandler()]
+    cfg = Config.load(args.config)
+    if cfg.log_file:
+        handlers.append(logging.FileHandler(cfg.log_file))
     logging.basicConfig(
         level=logging.INFO if args.verbose else logging.WARNING,
-        format="%(levelname)s %(name)s: %(message)s",
+        format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+        handlers=handlers,
     )
-    cfg = Config.load(args.config)
+
+    # Surface configuration problems; refuse to start live betting on errors.
+    problems = cfg.validate()
+    errors = [m for m in problems if m.startswith("ERROR")]
+    for m in problems:
+        print(f"  config: {m}")
+    if errors and args.command in ("go", "watch", "run"):
+        print("Refusing to start: fix the ERROR(s) above.")
+        return 2
 
     if args.command == "scan":
         return cmd_scan(cfg)
@@ -265,6 +315,8 @@ def main(argv=None) -> int:
         return cmd_backtest(cfg, args)
     if args.command == "report":
         return cmd_report(cfg)
+    if args.command == "status":
+        return cmd_status(cfg)
     if args.command == "settle":
         return cmd_settle(cfg, args.ref, args.result)
     return 1
