@@ -40,6 +40,9 @@ class Config:
         default_factory=lambda: {"pinnacle": 3.0, "_default": 1.0})
     consensus_min_books: int = 3        # min bookmakers required for a consensus
     consensus_alpha: float = 0.05       # Kaunitz bias term (single-value form)
+    # Recency weighting half-life (seconds) for the weighted consensus: fresher
+    # quotes count more near kickoff. 0 disables (equal weight regardless of age).
+    consensus_recency_halflife_seconds: float = 0.0
 
     # --- pinnacle (source of truth) ---
     pinnacle_source: str = "sample"     # "sample" | "the_odds_api" | "direct"

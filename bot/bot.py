@@ -180,18 +180,21 @@ class ValueBettingBot:
     def _consensus_lines_for_sport(self, sport: str, method: str) -> List[FairLine]:
         alpha = {r: self.cfg.consensus_alpha for r in ("home", "draw", "away")}
         try:
+            halflife = self.cfg.consensus_recency_halflife_seconds
             if self.cfg.pinnacle_source == "sample":
                 return consensus_lines_from_boards(
                     sample_multibook_boards(sport), method=method,
                     book_weights=self.cfg.book_weights,
                     devig_method=self.cfg.devig_method, alpha=alpha,
-                    min_books=self.cfg.consensus_min_books)
+                    min_books=self.cfg.consensus_min_books,
+                    recency_halflife=halflife)
             return consensus_lines_via_odds_api(
                 api_key=self.cfg.odds_api_key or "", sport_key=sport,
                 regions=self.cfg.regions, method=method,
                 book_weights=self.cfg.book_weights,
                 devig_method=self.cfg.devig_method, alpha=alpha,
-                min_books=self.cfg.consensus_min_books)
+                min_books=self.cfg.consensus_min_books,
+                recency_halflife=halflife)
         except Exception as exc:
             log.error("consensus fetch failed for %s: %s", sport, exc)
             return []

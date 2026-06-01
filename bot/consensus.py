@@ -21,11 +21,30 @@ booksum as a market-quality signal), consumed identically to Pinnacle lines.
 """
 from __future__ import annotations
 
+import datetime as _dt
+import math
 import statistics
 from typing import Dict, List, Optional
 
 from .devig import booksum, devig
 from .models import FairLine, MarketBoard
+
+
+def _recency_weight(last_update: Optional[str], halflife: float) -> float:
+    """Multiplier in (0,1] that decays with the age of a quote. Fresher quotes
+    near kickoff (when the line is sharpest) get more weight. halflife<=0 -> 1."""
+    if halflife <= 0 or not last_update:
+        return 1.0
+    try:
+        ts = _dt.datetime.fromisoformat(last_update.replace("Z", "+00:00"))
+        if ts.tzinfo is None:
+            ts = ts.replace(tzinfo=_dt.timezone.utc)
+    except (ValueError, TypeError):
+        return 1.0
+    age = (_dt.datetime.now(_dt.timezone.utc) - ts).total_seconds()
+    if age <= 0:
+        return 1.0
+    return 0.5 ** (age / halflife)
 
 # Kaunitz et al. regression intercepts (bias correction) per outcome.
 PAPER_ALPHA = {"home": 0.034, "draw": 0.057, "away": 0.037}
@@ -40,7 +59,8 @@ def _role(selection: str, home: str, away: str) -> str:
 
 
 def _weighted_line(board: MarketBoard, book_weights: Dict[str, float],
-                   devig_method: str, min_books: int) -> Optional[FairLine]:
+                   devig_method: str, min_books: int,
+                   recency_halflife: float = 0.0) -> Optional[FairLine]:
     selections = board.selections()
     acc = {s: 0.0 for s in selections}
     wsum = 0.0
@@ -55,6 +75,7 @@ def _weighted_line(board: MarketBoard, book_weights: Dict[str, float],
         except ValueError:
             continue
         w = book_weights.get(book.bookmaker.lower(), book_weights.get("_default", 1.0))
+        w *= _recency_weight(book.last_update, recency_halflife)
         if w <= 0:
             continue
         used += 1
@@ -115,6 +136,7 @@ def consensus_lines_from_boards(
     devig_method: str = "power",
     alpha: Optional[Dict[str, float]] = None,
     min_books: int = 3,
+    recency_halflife: float = 0.0,
 ) -> List[FairLine]:
     """Build consensus FairLines from multi-book market boards."""
     book_weights = {k.lower(): v for k, v in (book_weights or {}).items()}
@@ -122,7 +144,8 @@ def consensus_lines_from_boards(
     lines: List[FairLine] = []
     for board in boards:
         if method == "weighted":
-            fl = _weighted_line(board, book_weights, devig_method, min_books)
+            fl = _weighted_line(board, book_weights, devig_method, min_books,
+                                recency_halflife)
         elif method == "kaunitz":
             fl = _kaunitz_line(board, alpha, min_books)
         else:
@@ -136,7 +159,7 @@ def consensus_lines_via_odds_api(
     api_key: str, sport_key: str, regions: str = "uk,eu",
     method: str = "weighted", book_weights: Optional[Dict[str, float]] = None,
     devig_method: str = "power", alpha: Optional[Dict[str, float]] = None,
-    min_books: int = 3,
+    min_books: int = 3, recency_halflife: float = 0.0,
 ) -> List[FairLine]:
     """Fetch the full bookmaker market via The Odds API and build consensus lines."""
     from .providers.the_odds_api import TheOddsAPIProvider
@@ -145,4 +168,5 @@ def consensus_lines_via_odds_api(
         sport_key, ["h2h"])
     return consensus_lines_from_boards(
         boards, method=method, book_weights=book_weights,
-        devig_method=devig_method, alpha=alpha, min_books=min_books)
+        devig_method=devig_method, alpha=alpha, min_books=min_books,
+        recency_halflife=recency_halflife)

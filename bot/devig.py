@@ -23,7 +23,7 @@ import math
 from typing import List
 
 Method = str
-SUPPORTED_METHODS = ("multiplicative", "additive", "shin", "power")
+SUPPORTED_METHODS = ("multiplicative", "additive", "shin", "power", "ensemble")
 
 
 def _validate(odds: List[float]) -> None:
@@ -129,6 +129,17 @@ def power(odds: List[float], max_iter: int = 100, tol: float = 1e-12) -> List[fl
     return [x / total for x in p]
 
 
+def ensemble(odds: List[float]) -> List[float]:
+    """Average the multiplicative, Shin and power estimates, then renormalise.
+    No single de-vig method is right for every market; averaging the three
+    reduces model risk and tends to track true probability more robustly."""
+    _validate(odds)
+    methods = (multiplicative(odds), shin(odds), power(odds))
+    avg = [sum(vals) / len(methods) for vals in zip(*methods)]
+    total = sum(avg)
+    return [p / total for p in avg]
+
+
 def devig(odds: List[float], method: Method = "multiplicative") -> List[float]:
     """Dispatch to the requested de-vig method."""
     if method == "multiplicative":
@@ -139,6 +150,8 @@ def devig(odds: List[float], method: Method = "multiplicative") -> List[float]:
         return shin(odds)
     if method == "power":
         return power(odds)
+    if method == "ensemble":
+        return ensemble(odds)
     raise ValueError(
         f"unknown de-vig method {method!r}; choose one of {SUPPORTED_METHODS}"
     )
