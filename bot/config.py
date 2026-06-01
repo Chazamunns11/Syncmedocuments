@@ -13,11 +13,36 @@ from typing import List, Optional
 
 @dataclass
 class Config:
+    # --- pipeline mode ---
+    # "pinnacle_betfair": value Betfair Exchange prices against Pinnacle (the
+    #   source of truth) and place on Betfair. This is the recommended mode if
+    #   you're limited/banned on the soft books.
+    # "multi_book": classic cross-bookmaker value scan from a single odds feed.
+    mode: str = "pinnacle_betfair"
+
     # --- what to scan ---
     sports: List[str] = field(default_factory=lambda: ["soccer_epl"])
     markets: List[str] = field(default_factory=lambda: ["h2h"])
-    provider: str = "sample"            # "sample" | "the_odds_api"
+    provider: str = "sample"            # multi_book feed: "sample" | "the_odds_api"
     regions: str = "uk,eu"
+
+    # --- pinnacle (source of truth) ---
+    pinnacle_source: str = "sample"     # "sample" | "the_odds_api" | "direct"
+    # Pinnacle's own sport key naming differs per source; for the_odds_api use
+    # the odds-api sport key (e.g. soccer_epl); for direct use a sport in
+    # pinnacle.PINNACLE_SPORT_IDS (e.g. "soccer").
+    pinnacle_sports: List[str] = field(default_factory=lambda: ["soccer_epl"])
+
+    # --- betfair (betting venue) ---
+    venue_source: str = "sample"        # "sample" | "betfair"
+    betfair_event_type: str = "soccer"  # key in betfair_client.EVENT_TYPE_IDS
+    betfair_competition_ids: List[str] = field(default_factory=list)
+    betfair_commission: float = 0.05    # commission on net winnings (UK base 5%)
+    betfair_market_start_within_hours: int = 72
+
+    # --- event matching (pinnacle <-> betfair) ---
+    match_min_team_score: float = 0.6
+    match_start_window_minutes: int = 90
 
     # --- value detection ---
     reference_books: List[str] = field(default_factory=lambda: ["pinnacle"])
@@ -51,6 +76,8 @@ class Config:
     betfair_password: Optional[str] = None
     betfair_app_key: Optional[str] = None
     betfair_certs_path: Optional[str] = None
+    pinnacle_username: Optional[str] = None
+    pinnacle_password: Optional[str] = None
 
     @classmethod
     def load(cls, path: Optional[str] = "config.yaml") -> "Config":
@@ -75,6 +102,8 @@ class Config:
         self.betfair_password = os.getenv("BETFAIR_PASSWORD", self.betfair_password)
         self.betfair_app_key = os.getenv("BETFAIR_APP_KEY", self.betfair_app_key)
         self.betfair_certs_path = os.getenv("BETFAIR_CERTS_PATH", self.betfair_certs_path)
+        self.pinnacle_username = os.getenv("PINNACLE_USERNAME", self.pinnacle_username)
+        self.pinnacle_password = os.getenv("PINNACLE_PASSWORD", self.pinnacle_password)
         # Allow a hard env override for the live switch (belt-and-braces safety).
         if os.getenv("BETTING_LIVE", "").lower() in {"1", "true", "yes"}:
             self.live = True

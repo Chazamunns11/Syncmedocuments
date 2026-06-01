@@ -1,12 +1,9 @@
-"""Bet executors: place a sized ValueBet at a venue and report the result."""
+"""Bet executors: place a sized ValueBet at a venue and report the result.
+
+``BetfairExecutor`` is intentionally NOT imported here so this package never
+requires ``betfairlightweight``; import it lazily from ``bot.execution.betfair``.
+"""
 from .base import Executor
 from .paper import PaperExecutor
 
-__all__ = ["Executor", "PaperExecutor", "get_betfair_executor"]
-
-
-def get_betfair_executor(*args, **kwargs):
-    """Lazy accessor so importing this package never requires betfairlightweight."""
-    from .betfair import BetfairExecutor
-
-    return BetfairExecutor(*args, **kwargs)
+__all__ = ["Executor", "PaperExecutor"]

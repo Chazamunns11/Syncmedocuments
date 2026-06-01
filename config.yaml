@@ -1,38 +1,61 @@
 # Value betting bot configuration.
-# Secrets (API keys, Betfair login) come from environment variables, NOT here.
-# See .env.example.
+# Secrets (API keys, Betfair/Pinnacle logins) come from environment variables,
+# NOT here. See .env.example.
 
-# --- what to scan ---
-provider: sample            # "sample" (offline demo) or "the_odds_api"
-sports:
-  - soccer_epl
-markets:
-  - h2h                     # head-to-head / moneyline
-regions: uk,eu
+# === pipeline mode ===
+# pinnacle_betfair : value Betfair Exchange prices against Pinnacle (truth) and
+#                    place on Betfair. Recommended if you're limited on soft books.
+# multi_book       : classic cross-bookmaker value scan from a single odds feed.
+mode: pinnacle_betfair
 
-# --- value detection ---
-reference_books:            # sharp book(s) used to estimate the fair price
-  - pinnacle
+# === source of truth: Pinnacle ===
+pinnacle_source: sample        # sample | the_odds_api | direct
+pinnacle_sports:
+  - soccer_epl                 # odds-api sport key (the_odds_api/sample);
+                               # use "soccer" etc. for pinnacle_source: direct
 devig_method: multiplicative   # multiplicative | additive | shin
-min_edge: 0.02              # require >= 2% overlay vs fair price
+
+# === betting venue: Betfair Exchange ===
+venue_source: sample           # sample | betfair
+betfair_event_type: soccer     # soccer | tennis | basketball | ... (see code)
+betfair_competition_ids: []    # optional Betfair competition id filter
+betfair_commission: 0.05       # commission on net winnings (UK base rate 5%)
+betfair_market_start_within_hours: 72
+
+# === event matching (pinnacle <-> betfair) ===
+match_min_team_score: 0.6      # min team-name similarity to pair an event
+match_start_window_minutes: 90 # max kickoff-time difference to pair an event
+
+# === value detection ===
+reference_books:
+  - pinnacle
+min_edge: 0.02                 # require >= 2% overlay AFTER commission
 min_price: 1.30
 max_price: 15.0
 
-# --- staking / bankroll ---
+# === staking / bankroll ===
 bankroll: 1000.0
-kelly_multiplier: 0.25      # quarter-Kelly (conservative)
-max_fraction_per_bet: 0.02  # never stake more than 2% of bankroll on one bet
+kelly_multiplier: 0.25         # quarter-Kelly (conservative)
+max_fraction_per_bet: 0.02
 min_stake: 1.0
 max_stake: 100.0
-max_total_exposure_fraction: 0.10  # cap total staked per run at 10% of bankroll
+max_total_exposure_fraction: 0.10
 
-# --- execution ---
-executor: paper             # "paper" (safe default) or "betfair"
-live: false                 # MUST be true to place real bets via betfair
+# === execution ===
+executor: betfair              # betfair | paper. Falls back to paper unless live.
+live: false                    # MUST be true to place real bets on Betfair
+betfair_dry_run: true          # resolve markets but don't send live orders
 paper_slippage: 0.0
 paper_fill_probability: 1.0
-betfair_dry_run: true       # resolve markets but don't send live orders
 
-# --- storage ---
+# === multi_book mode only ===
+provider: sample               # sample | the_odds_api
+regions: uk,eu
+sports:
+  - soccer_epl
+markets:
+  - h2h
+
+# === storage ===
 db_path: bets.db
 csv_path: bets.csv

@@ -96,6 +96,7 @@ class ValueDetector:
         min_price: float = 1.30,
         max_price: float = 15.0,
         exclude_books: Optional[List[str]] = None,
+        commission: float = 0.0,
     ):
         # Reference (sharp) books in priority order.
         self.reference_books = reference_books or ["pinnacle"]
@@ -103,9 +104,20 @@ class ValueDetector:
         self.min_edge = min_edge          # require price/fair_price - 1 >= this
         self.min_price = min_price        # ignore very short prices
         self.max_price = max_price        # ignore lottery longshots
+        # Commission charged on net winnings at the betting venue (e.g. Betfair
+        # ~2-5%). The edge/EV/Kelly are computed on the commission-adjusted
+        # ("effective") price so the bot only bets when value survives the rake.
+        self.commission = commission
         # Never flag the reference book against itself.
         self.exclude_books = {b.lower() for b in (exclude_books or [])}
         self.exclude_books |= {b.lower() for b in self.reference_books}
+
+    def _effective_price(self, price: float) -> float:
+        """Decimal odds after commission on net winnings: a winning back bet at
+        ``price`` returns (price-1)*(1-commission) profit per unit staked."""
+        if self.commission <= 0:
+            return price
+        return 1.0 + (price - 1.0) * (1.0 - self.commission)
 
     def detect_board(self, board: MarketBoard) -> List[ValueBet]:
         fair = _fair_probs(board, self.reference_books, self.devig_method)
@@ -123,11 +135,13 @@ class ValueDetector:
                 price = outcome.price
                 if price < self.min_price or price > self.max_price:
                     continue
+                eff_price = self._effective_price(price)
                 fair_price = 1.0 / p
-                edge = price / fair_price - 1.0
+                # Edge and EV are measured on the commission-adjusted price.
+                edge = eff_price / fair_price - 1.0
                 if edge < self.min_edge:
                     continue
-                ev = expected_value(p, price)
+                ev = expected_value(p, eff_price)
                 if ev <= 0:
                     continue
                 found.append(
@@ -144,7 +158,11 @@ class ValueDetector:
                         fair_price=fair_price,
                         edge=edge,
                         ev=ev,
-                        kelly_fraction=kelly_fraction(p, price),
+                        kelly_fraction=kelly_fraction(p, eff_price),
+                        commission=self.commission,
+                        eff_price=eff_price,
+                        venue_market_id=book.market_id,
+                        venue_selection_id=outcome.selection_id,
                     )
                 )
         return found

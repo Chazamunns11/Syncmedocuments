@@ -43,7 +43,10 @@ def cmd_scan(cfg: Config) -> int:
         for b in bets:
             print(f"  [{b.edge*100:5.1f}% edge] {b.matchup} | {b.market} | "
                   f"{b.selection} @ {b.price:.2f} ({b.bookmaker})")
-            print(f"      fair {b.fair_price:.2f} (p={b.fair_prob:.3f})  "
+            comm = ""
+            if b.commission and b.eff_price:
+                comm = f" net {b.eff_price:.2f} after {b.commission*100:.0f}% comm"
+            print(f"      fair {b.fair_price:.2f} (p={b.fair_prob:.3f}){comm}  "
                   f"EV/unit {b.ev:+.3f}  Kelly {b.kelly_fraction*100:.2f}%  "
                   f"stake {_fmt_money(b.stake)}")
         return 0
