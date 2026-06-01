@@ -103,11 +103,20 @@ class ValueDetector:
         edge_haircut: float = 0.0,
         min_liquidity: float = 0.0,
         max_overround: float = 1.20,
+        min_expected_clv: float = 0.0,
+        one_per_event: bool = True,
     ):
         # Reference (sharp) books in priority order.
         self.reference_books = reference_books or ["pinnacle"]
         self.devig_method = devig_method
         self.min_edge = min_edge          # require price/fair_price - 1 >= this
+        # Require the taken price to beat the fair (closing-proxy) price by at
+        # least this much GROSS of commission -> positive expected Closing Line
+        # Value. Beating the closing line is the strongest predictor of a real
+        # edge, so this is the core "only bet +CLV" guard.
+        self.min_expected_clv = min_expected_clv
+        # Place at most one bet per event (keep the best-edge selection).
+        self.one_per_event = one_per_event
         self.min_price = min_price        # ignore very short prices
         self.max_price = max_price        # ignore lottery longshots
         # Commission charged on net winnings at the betting venue (e.g. Betfair
@@ -169,6 +178,12 @@ class ValueDetector:
                     continue
                 eff_price = self._effective_price(price)
                 fair_price = 1.0 / p
+                # Expected Closing Line Value: how much the taken price beats the
+                # fair (closing-proxy) price, GROSS of commission. Must be > the
+                # configured minimum so we only ever take +CLV bets.
+                exp_clv = price / fair_price - 1.0
+                if exp_clv < self.min_expected_clv:
+                    continue
                 # Edge and EV are measured on the commission-adjusted price, then
                 # cut by a conservative haircut before the threshold test.
                 edge = eff_price / fair_price - 1.0
@@ -192,6 +207,7 @@ class ValueDetector:
                         fair_price=fair_price,
                         edge=net_edge,
                         ev=ev,
+                        exp_clv=exp_clv,
                         # Size Kelly on the haircut-adjusted probability so stakes
                         # stay conservative relative to estimation uncertainty.
                         kelly_fraction=kelly_fraction(p / (1.0 + self.edge_haircut),
@@ -211,4 +227,14 @@ class ValueDetector:
             bets.extend(self.detect_board(board))
         # Best edge first.
         bets.sort(key=lambda b: b.edge, reverse=True)
+        if self.one_per_event:
+            # Keep only the single best-edge bet per event.
+            seen = set()
+            unique = []
+            for b in bets:
+                if b.event_id in seen:
+                    continue
+                seen.add(b.event_id)
+                unique.append(b)
+            bets = unique
         return bets

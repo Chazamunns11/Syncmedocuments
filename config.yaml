@@ -49,6 +49,8 @@ max_price: 15.0
 edge_haircut: 0.01             # subtract from edge for estimation error/slippage
 min_liquidity: 10.0            # min money (in stake currency) available to back
 max_overround: 1.15            # skip Pinnacle markets wider than this booksum
+min_expected_clv: 0.0          # only bet when expected CLV exceeds this (>0 = +CLV)
+one_bet_per_event: true        # never place more than one bet on a single event
 
 # === continuous / near-kickoff scheduling (used by `run.py watch`) ===
 poll_interval_seconds: 60      # cadence when nothing is near kickoff
@@ -57,11 +59,12 @@ place_window_minutes: 3        # start placing this long before kickoff (sharp l
 min_seconds_before_start: 20   # stop placing this close to kickoff (avoid in-play)
 
 # === staking / bankroll ===
-bankroll: 1000.0
+bankroll: 1000.0               # your budget / starting bank
 kelly_multiplier: 0.20         # 15-20% Kelly is the practitioner range
+flat_stake:                    # set a number for a FIXED stake per bet (overrides Kelly)
 max_fraction_per_bet: 0.02
 min_stake: 1.0
-max_stake: 100.0
+max_stake: 100.0               # bet size cap
 max_total_exposure_fraction: 0.10
 
 # === execution ===

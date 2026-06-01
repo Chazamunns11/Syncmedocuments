@@ -48,9 +48,11 @@ CREATE TABLE IF NOT EXISTS placements (
     matched_stake REAL,
     external_ref TEXT,
     message TEXT,
+    event_id TEXT,
     fair_price REAL,
     edge REAL,
     eff_price REAL,
+    exp_clv REAL,
     settlement TEXT DEFAULT 'PENDING',
     profit REAL,
     settled_at TEXT,
@@ -59,11 +61,17 @@ CREATE TABLE IF NOT EXISTS placements (
 );
 CREATE INDEX IF NOT EXISTS idx_placements_ref ON placements(external_ref);
 CREATE INDEX IF NOT EXISTS idx_placements_key ON placements(bet_key);
+CREATE INDEX IF NOT EXISTS idx_placements_event ON placements(event_id);
 """
 
 # Columns added after the first release; ensured on every open for old DBs.
+# (column_name, sql_type)
 _MIGRATIONS = {
-    "placements": ["fair_price", "edge", "eff_price", "closing_fair_price", "clv"],
+    "placements": [
+        ("fair_price", "REAL"), ("edge", "REAL"), ("eff_price", "REAL"),
+        ("exp_clv", "REAL"), ("closing_fair_price", "REAL"), ("clv", "REAL"),
+        ("event_id", "TEXT"),
+    ],
 }
 
 
@@ -81,9 +89,10 @@ class BetStore:
         for table, columns in _MIGRATIONS.items():
             existing = {r["name"] for r in
                         self._conn.execute(f"PRAGMA table_info({table})")}
-            for col in columns:
+            for col, sqltype in columns:
                 if col not in existing:
-                    self._conn.execute(f"ALTER TABLE {table} ADD COLUMN {col} REAL")
+                    self._conn.execute(
+                        f"ALTER TABLE {table} ADD COLUMN {col} {sqltype}")
 
     # -- writes ------------------------------------------------------------
     def log_value_bet(self, bet: ValueBet) -> None:
@@ -102,19 +111,21 @@ class BetStore:
 
     def log_placement(self, result: PlacementResult,
                       bet: Optional[ValueBet] = None) -> int:
+        event_id = bet.event_id if bet else None
         fair_price = bet.fair_price if bet else None
         edge = bet.edge if bet else None
         eff_price = bet.eff_price if bet else None
+        exp_clv = bet.exp_clv if bet else None
         cur = self._conn.execute(
             """INSERT INTO placements
                (bet_key, placed_at, executor, status, requested_price,
                 requested_stake, matched_price, matched_stake, external_ref,
-                message, fair_price, edge, eff_price)
-               VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                message, event_id, fair_price, edge, eff_price, exp_clv)
+               VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
             (result.bet_key, result.placed_at, result.executor, result.status,
              result.requested_price, result.requested_stake, result.matched_price,
              result.matched_stake, result.external_ref, result.message,
-             fair_price, edge, eff_price),
+             event_id, fair_price, edge, eff_price, exp_clv),
         )
         self._conn.commit()
         if self.csv_path:
@@ -130,6 +141,26 @@ class BetStore:
             (bet_key,),
         ).fetchone()
         return row is not None
+
+    def already_placed_event(self, event_id: str) -> bool:
+        """True if this EVENT already has a non-failed placement — enforces the
+        one-bet-per-event rule across runs."""
+        if not event_id:
+            return False
+        row = self._conn.execute(
+            "SELECT 1 FROM placements WHERE event_id = ? "
+            "AND status IN ('PLACED','MATCHED','DRY_RUN') LIMIT 1",
+            (event_id,),
+        ).fetchone()
+        return row is not None
+
+    def unrecorded_closing(self):
+        """Placed bets that don't yet have a closing line recorded (for CLV)."""
+        return self._conn.execute(
+            "SELECT external_ref, event_id, bet_key FROM placements "
+            "WHERE status IN ('PLACED','MATCHED','DRY_RUN') "
+            "AND closing_fair_price IS NULL AND external_ref IS NOT NULL"
+        ).fetchall()
 
     def record_closing(self, external_ref: str, closing_fair_price: float
                        ) -> Optional[float]:
@@ -218,6 +249,7 @@ class BetStore:
                  COALESCE(SUM(CASE WHEN settlement='LOST' THEN 1 ELSE 0 END),0) AS lost,
                  COALESCE(SUM(CASE WHEN settlement='PENDING' THEN 1 ELSE 0 END),0) AS pending,
                  AVG(edge) AS avg_edge,
+                 AVG(exp_clv) AS avg_exp_clv,
                  AVG(clv) AS avg_clv,
                  COALESCE(SUM(CASE WHEN clv > 0 THEN 1 ELSE 0 END),0) AS clv_beat,
                  COALESCE(SUM(CASE WHEN clv IS NOT NULL THEN 1 ELSE 0 END),0) AS clv_n

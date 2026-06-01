@@ -3,13 +3,18 @@
 
 Examples
 --------
+  # ONE COMMAND: set your budget + bet size and start betting continuously.
+  python run.py go --budget 1000 --stake 50          # flat 50 per bet
+  python run.py go --budget 1000 --kelly 0.2         # or 20% Kelly
+  python run.py go --budget 1000 --stake 50 --live   # real bets on Betfair
+
   # Identify value bets only (no placement), using offline sample data:
   python run.py scan
 
   # Identify, place (paper by default) and log:
   python run.py run
 
-  # Run continuously, placing each bet as close to kickoff as possible:
+  # Run continuously using config.yaml settings (same engine as `go`):
   python run.py watch
 
   # Show logged placements and running P&L:
@@ -42,16 +47,17 @@ def cmd_scan(cfg: Config) -> int:
         if not bets:
             print("No value bets found.")
             return 0
-        print(f"\nFound {len(bets)} value bet(s):\n")
+        print(f"\nFound {len(bets)} value bet(s) (max one per event):\n")
         for b in bets:
-            print(f"  [{b.edge*100:5.1f}% edge] {b.matchup} | {b.market} | "
-                  f"{b.selection} @ {b.price:.2f} ({b.bookmaker})")
+            print(f"  {b.matchup} | {b.market} | {b.selection} @ {b.price:.2f} "
+                  f"({b.bookmaker})")
             comm = ""
             if b.commission and b.eff_price:
                 comm = f" net {b.eff_price:.2f} after {b.commission*100:.0f}% comm"
-            print(f"      fair {b.fair_price:.2f} (p={b.fair_prob:.3f}){comm}  "
-                  f"EV/unit {b.ev:+.3f}  Kelly {b.kelly_fraction*100:.2f}%  "
-                  f"stake {_fmt_money(b.stake)}")
+            print(f"      fair {b.fair_price:.2f} (p={b.fair_prob:.3f}){comm}")
+            print(f"      taken value {b.edge*100:+.2f}%   "
+                  f"expected CLV {b.exp_clv*100:+.2f}%   "
+                  f"EV/unit {b.ev:+.3f}   stake {_fmt_money(b.stake)}")
         return 0
     finally:
         bot.close()
@@ -70,8 +76,9 @@ def cmd_run(cfg: Config) -> int:
         print(f"\nPlaced/simulated {placed}/{len(results)} bet(s):\n")
         for bet, r in results:
             print(f"  {r.status:8s} {bet.selection} @ {bet.price:.2f} "
-                  f"stake {_fmt_money(bet.stake)} via {r.executor} "
-                  f"[{r.external_ref or '-'}] {r.message}")
+                  f"stake {_fmt_money(bet.stake)} | value {bet.edge*100:+.2f}% "
+                  f"exp-CLV {bet.exp_clv*100:+.2f}% via {r.executor} "
+                  f"[{r.external_ref or '-'}]")
         return 0
     finally:
         bot.close()
@@ -88,9 +95,18 @@ def cmd_watch(cfg: Config) -> int:
         min_seconds_before_start=cfg.min_seconds_before_start,
     )
     mode = "LIVE" if (cfg.live and cfg.executor == "betfair") else "PAPER"
-    print(f"Watching continuously in {mode} mode. "
-          f"Placing within {cfg.place_window_minutes:.0f} min of kickoff. "
+    if cfg.flat_stake is not None:
+        staking = f"flat {_fmt_money(cfg.flat_stake)}/bet"
+    else:
+        staking = f"{cfg.kelly_multiplier*100:.0f}% Kelly"
+    print("=" * 64)
+    print(f"  Value betting bot — GO  [{mode}]")
+    print(f"  budget {_fmt_money(cfg.bankroll)} | staking {staking} | "
+          f"max {_fmt_money(cfg.max_stake)}/bet")
+    print(f"  truth: {cfg.truth_model} | only +CLV bets | max ONE bet per event")
+    print(f"  placing within {cfg.place_window_minutes:.0f} min of kickoff. "
           f"Ctrl-C to stop.")
+    print("=" * 64)
     try:
         runner.run()
         return 0
@@ -100,6 +116,24 @@ def cmd_watch(cfg: Config) -> int:
         return 0
     finally:
         bot.close()
+
+
+def cmd_go(cfg: Config, args) -> int:
+    """One-command start: apply budget/stake overrides, then bet continuously."""
+    if args.budget is not None:
+        cfg.bankroll = args.budget
+    if args.kelly is not None:
+        cfg.kelly_multiplier = args.kelly
+    if args.stake is not None:
+        cfg.flat_stake = args.stake
+    if args.max_stake is not None:
+        cfg.max_stake = args.max_stake
+    if args.min_clv is not None:
+        cfg.min_expected_clv = args.min_clv
+    if args.live:
+        cfg.live = True
+        cfg.executor = "betfair"
+    return cmd_watch(cfg)
 
 
 def cmd_report(cfg: Config) -> int:
@@ -112,11 +146,14 @@ def cmd_report(cfg: Config) -> int:
         print(f"  settled:        won {s['won']}  lost {s['lost']}  pending {s['pending']}")
         print(f"  realised P&L:   {_fmt_money(s['profit'])}")
         print(f"  ROI (settled):  {s['roi']*100:+.2f}%")
-        print(f"  avg edge:       {(s['avg_edge'] or 0)*100:+.2f}%")
+        print(f"  avg taken value:{(s['avg_edge'] or 0)*100:+.2f}%")
+        print(f"  avg exp CLV:    {(s['avg_exp_clv'] or 0)*100:+.2f}%")
         if s["clv_n"]:
-            print(f"  CLV:            avg {(s['avg_clv'] or 0)*100:+.2f}%  "
+            print(f"  realised CLV:   avg {(s['avg_clv'] or 0)*100:+.2f}%  "
                   f"beat close {s['clv_beat']}/{s['clv_n']} "
                   f"({s['clv_beat_rate']*100:.0f}%)")
+        else:
+            print("  realised CLV:   (none captured yet — recorded at kickoff)")
         print("\n=== Recent placements ===")
         for row in bot.store.recent_placements(limit=20):
             print(f"  {row['placed_at'][:19]} {row['status']:8s} "
@@ -149,6 +186,17 @@ def main(argv=None) -> int:
     sub.add_parser("scan", help="identify value bets only")
     sub.add_parser("run", help="identify, place and log value bets (one shot)")
     sub.add_parser("watch", help="run continuously, placing bets near kickoff")
+    # `go`: one command to start betting. Set budget/stake and press go.
+    p_go = sub.add_parser("go", help="set budget/stake and start betting continuously")
+    p_go.add_argument("--budget", type=float, help="bankroll / budget")
+    p_go.add_argument("--kelly", type=float, help="Kelly fraction, e.g. 0.2 (15-20%%)")
+    p_go.add_argument("--stake", type=float,
+                      help="FIXED stake per bet (overrides Kelly)")
+    p_go.add_argument("--max-stake", type=float, help="max stake per bet")
+    p_go.add_argument("--min-clv", type=float,
+                      help="min expected CLV to bet, e.g. 0.01 (default 0 = >0)")
+    p_go.add_argument("--live", action="store_true",
+                      help="place REAL bets on Betfair (default: paper)")
     sub.add_parser("report", help="show logged placements and P&L")
     p_settle = sub.add_parser("settle", help="mark a placed bet WON/LOST/VOID")
     p_settle.add_argument("--ref", required=True, help="external_ref of the placement")
@@ -167,6 +215,8 @@ def main(argv=None) -> int:
         return cmd_run(cfg)
     if args.command == "watch":
         return cmd_watch(cfg)
+    if args.command == "go":
+        return cmd_go(cfg, args)
     if args.command == "report":
         return cmd_report(cfg)
     if args.command == "settle":

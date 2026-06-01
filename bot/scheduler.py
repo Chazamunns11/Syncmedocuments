@@ -46,6 +46,7 @@ class ContinuousRunner:
         refresh_interval: float = 5.0,      # cadence when an event is in-window
         place_window_minutes: float = 3.0,  # start betting this long before the off
         min_seconds_before_start: float = 20.0,  # stop betting this close to the off
+        closing_capture_seconds: Optional[float] = None,  # snapshot CLV this close to off
         keepalive_every_cycles: int = 15,
         now_fn: Callable[[], float] = time.time,
         sleep_fn: Callable[[float], None] = time.sleep,
@@ -56,6 +57,10 @@ class ContinuousRunner:
         self.refresh_interval = refresh_interval
         self.place_window = place_window_minutes * 60.0
         self.min_seconds_before_start = min_seconds_before_start
+        # Capture the closing fair line (for realised CLV) this close to kickoff.
+        self.closing_capture_seconds = (
+            closing_capture_seconds if closing_capture_seconds is not None
+            else min_seconds_before_start)
         self.keepalive_every_cycles = keepalive_every_cycles
         self.now_fn = now_fn
         self.sleep_fn = sleep_fn
@@ -100,7 +105,39 @@ class ContinuousRunner:
         results = self.bot.place_bets(due) if due else []
         # Stash for the sleep calculation (so callers/tests can inspect, too).
         self._last_bets = bets
+        self.capture_closing()
         return results
+
+    def capture_closing(self) -> int:
+        """Record the closing fair line (for realised CLV) for any placed bet now
+        within ``closing_capture_seconds`` of kickoff. The taken price vs this
+        closing fair price is the bet's CLV. Returns the number recorded."""
+        store = self.bot.store
+        try:
+            pending = store.unrecorded_closing()
+        except Exception:
+            return 0
+        boards = {b.event_id: b for b in getattr(self.bot, "_last_boards", [])}
+        recorded = 0
+        for row in pending:
+            event_id = row["event_id"]
+            board = boards.get(event_id)
+            if board is None:
+                continue  # no fresh price available to snapshot yet
+            secs = None
+            epoch = _to_epoch(board.commence_time)
+            if epoch is not None:
+                secs = epoch - self.now_fn()
+                if secs > self.closing_capture_seconds:
+                    continue  # not close enough to kickoff yet
+            selection = (row["bet_key"].split("|") + ["", "", ""])[2]
+            fair = self.bot.fair_price_for(event_id, selection)
+            if fair:
+                clv = store.record_closing(row["external_ref"], fair)
+                if clv is not None:
+                    recorded += 1
+                    log.info("CLV recorded for %s: %+.2f%%", selection, clv * 100)
+        return recorded
 
     def run(self) -> None:
         log.info("continuous runner started (place window %.0fs before start, "

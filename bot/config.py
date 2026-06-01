@@ -68,6 +68,8 @@ class Config:
     edge_haircut: float = 0.01         # conservative edge cut for estimation error
     min_liquidity: float = 10.0        # min money available to back at the venue
     max_overround: float = 1.15        # skip Pinnacle markets wider than this booksum
+    min_expected_clv: float = 0.0      # only bet when expected CLV exceeds this (>0)
+    one_bet_per_event: bool = True     # never place more than one bet on an event
 
     # --- continuous / near-kickoff scheduling ---
     poll_interval_seconds: float = 60.0     # cadence when nothing is near kickoff
@@ -76,8 +78,9 @@ class Config:
     min_seconds_before_start: float = 20.0  # stop betting this close to kickoff
 
     # --- staking / bankroll ---
-    bankroll: float = 1000.0
+    bankroll: float = 1000.0           # your budget / starting bank
     kelly_multiplier: float = 0.20      # 15-20% Kelly is the practitioner range
+    flat_stake: Optional[float] = None  # if set, stake this fixed amount per bet
     max_fraction_per_bet: float = 0.02
     min_stake: float = 1.0
     max_stake: float = 100.0

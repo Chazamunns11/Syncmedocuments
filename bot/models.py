@@ -93,9 +93,10 @@ class ValueBet:
     price: float             # decimal odds we intend to take
     fair_prob: float         # de-vigged probability of winning
     fair_price: float        # 1 / fair_prob
-    edge: float              # price / fair_price - 1  (relative overlay)
+    edge: float              # taken value: net overlay vs fair price (after commission/haircut)
     ev: float                # expected profit per 1 unit staked (net of commission)
     kelly_fraction: float    # fraction of bankroll suggested (pre-cap)
+    exp_clv: float = 0.0     # expected Closing Line Value: gross price/fair_price - 1
     stake: float = 0.0       # actual stake assigned by bankroll manager
     # Exchange / commission detail (populated for venue bets such as Betfair).
     commission: float = 0.0          # commission rate applied to net winnings

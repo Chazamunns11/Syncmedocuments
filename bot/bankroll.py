@@ -12,7 +12,7 @@ Stakes are rounded to a sensible currency precision.
 """
 from __future__ import annotations
 
-from typing import List
+from typing import List, Optional
 
 from .models import ValueBet
 
@@ -27,6 +27,7 @@ class BankrollManager:
         max_stake: float = 250.0,
         max_total_exposure_fraction: float = 0.10,
         round_to: float = 0.01,
+        flat_stake: Optional[float] = None,
     ):
         if bankroll <= 0:
             raise ValueError("bankroll must be positive")
@@ -37,6 +38,9 @@ class BankrollManager:
         self.max_stake = max_stake
         self.max_total_exposure_fraction = max_total_exposure_fraction
         self.round_to = round_to
+        # When set, every bet stakes this fixed amount (the Kaunitz / practitioner
+        # constant-stake approach) instead of Kelly sizing.
+        self.flat_stake = flat_stake
 
     def _round(self, x: float) -> float:
         if self.round_to <= 0:
@@ -44,9 +48,12 @@ class BankrollManager:
         return round(x / self.round_to) * self.round_to
 
     def stake_for(self, bet: ValueBet) -> float:
-        frac = bet.kelly_fraction * self.kelly_multiplier
-        frac = min(frac, self.max_fraction_per_bet)
-        stake = frac * self.bankroll
+        if self.flat_stake is not None:
+            stake = self.flat_stake
+        else:
+            frac = bet.kelly_fraction * self.kelly_multiplier
+            frac = min(frac, self.max_fraction_per_bet)
+            stake = frac * self.bankroll
         stake = min(stake, self.max_stake)
         # Never stake more than is available to back at the venue price: a
         # larger order would partially fill at worse prices and erode the edge.

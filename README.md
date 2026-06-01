@@ -48,19 +48,45 @@ The bot **cannot place a real bet** unless you explicitly set `live: true`,
 ```bash
 pip install -r requirements.txt        # not needed for the offline/paper demo
 
-python run.py scan       # identify value bets (offline sample data)
-python run.py run        # identify, place (paper) and log — one shot
-python run.py watch      # run CONTINUOUSLY, placing each bet near kickoff
-python run.py report     # logged bets + running P&L + edge + CLV
-python run.py settle --ref paper-xxxx --result WON   # settle a finished bet
+# ONE COMMAND TO START BETTING — set your budget and bet size, press go:
+python run.py go --budget 1000 --stake 50          # flat £50 per bet
+python run.py go --budget 1000 --kelly 0.2         # or 20% Kelly sizing
+python run.py go --budget 1000 --stake 50 --live   # place REAL bets on Betfair
+
+# Other commands:
+python run.py scan       # just show the value bets (taken value + expected CLV)
+python run.py report     # logged bets + P&L + taken value + CLV
+python run.py settle --ref paper-xxxx --result WON # settle a finished bet
 ```
 
-Sample-mode `scan` output:
+`go` runs continuously: it finds value, places **at most one bet per event** as
+close to kickoff as possible, logs the **taken value and expected CLV** of every
+bet, and **auto-records the realised CLV** at kickoff. Ctrl-C to stop. Defaults
+come from `config.yaml`; the flags just override budget/stake on the fly.
+
+Sample-mode `scan` output (every bet shows **taken value** and **expected CLV**):
 
 ```
-[  6.7% edge] Arsenal vs Chelsea | h2h | Arsenal @ 2.20 (betfair)
-    fair 2.01 (p=0.499) net 2.14 after 5% comm  EV/unit +0.067  Kelly 5.86%  stake 14.65
+Arsenal vs Chelsea | h2h | Arsenal @ 2.20 (betfair)
+    fair 2.02 (p=0.496) net 2.14 after 5% comm
+    taken value +5.20%   expected CLV +9.18%   EV/unit +0.062   stake 50.00
 ```
+
+### Taken value, expected CLV, and the "+CLV only" rule
+- **Taken value** = how much the price you take beats the fair price, *after*
+  commission and the haircut — your realised edge on the bet.
+- **Expected CLV** = how much the taken price beats the fair (closing-proxy) price
+  *gross* of commission — your expected Closing Line Value. The bot **only places
+  bets where expected CLV is positive** (`min_expected_clv`, default `0`), so by
+  construction every bet is taken at +CLV. Raise it (e.g. `--min-clv 0.02`) to
+  demand a bigger CLV cushion.
+- **Realised CLV** is captured automatically: the scheduler snapshots the fair
+  line ~20s before kickoff and stores `taken_price / closing_fair_price − 1`.
+  `report` shows the average and the beat-the-close rate — your real scoreboard.
+
+> Note: you can *target* +CLV on every bet (and we only enter at +expected-CLV),
+> but no system can *guarantee* realised CLV — the market can still move after you
+> bet. Betting as late as possible (this bot does) keeps taken ≈ closing.
 
 ## How it works (mode: `pinnacle_betfair`)
 
@@ -212,11 +238,12 @@ environment (`.env`). Key settings: `mode`, `pinnacle_source`, `venue_source`,
 python -m unittest discover -s tests -v
 ```
 
-52 tests: de-vig math (incl. power), Kelly/EV, commission-adjusted value, the
-weighted + Kaunitz consensus models and blend, book weighting, the edge haircut /
-liquidity / overround filters, liquidity stake cap, the Betfair price ladder,
-event matching, the continuous scheduler (window + dedup), store + settlement +
-CLV, the live-money safety gate, and full paper pipelines for every truth model.
+60 tests: de-vig math (incl. power), Kelly/EV, commission-adjusted value, the
+weighted + Kaunitz consensus models and blend, book weighting, edge haircut /
+liquidity / overround filters, flat + Kelly staking with liquidity cap, expected
+CLV filtering, one-bet-per-event dedup, the Betfair price ladder, event matching,
+the continuous scheduler (window + dedup + automatic CLV capture), store +
+settlement + CLV, the `go` command, and full paper pipelines for every truth model.
 
 ## Modes
 
@@ -242,6 +269,6 @@ bot/
   execution/         paper (default) + betfair (real exchange)
   store.py           SQLite + CSV logging, settlement, P&L + CLV
   bot.py             orchestration (concurrent fetch) + live-money safety gate
-run.py               CLI: scan | run | watch | report | settle
+run.py               CLI: go | scan | run | watch | report | settle
 tests/               unit + end-to-end tests
 ```

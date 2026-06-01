@@ -104,6 +104,8 @@ class ValueBettingBot:
             edge_haircut=cfg.edge_haircut,
             min_liquidity=cfg.min_liquidity,
             max_overround=cfg.max_overround,
+            min_expected_clv=cfg.min_expected_clv,
+            one_per_event=cfg.one_bet_per_event,
         )
         self.bankroll = BankrollManager(
             bankroll=cfg.bankroll,
@@ -112,8 +114,11 @@ class ValueBettingBot:
             min_stake=cfg.min_stake,
             max_stake=cfg.max_stake,
             max_total_exposure_fraction=cfg.max_total_exposure_fraction,
+            flat_stake=cfg.flat_stake,
         )
         self.store = BetStore(db_path=cfg.db_path, csv_path=cfg.csv_path)
+        # Latest matched boards, kept so CLV can be captured at kickoff.
+        self._last_boards: List[MarketBoard] = []
         # A single Betfair session shared between the price source and executor.
         self._betfair: Optional[BetfairClient] = None
         # Persistent executor reused across a continuous loop.
@@ -228,6 +233,7 @@ class ValueBettingBot:
             ).build_boards(fair, quotes)
             log.info("pinnacle lines=%d, betfair quotes=%d -> %d matched boards",
                      len(fair), len(quotes), len(boards))
+            self._last_boards = boards
             return boards
         if self.cfg.mode == "multi_book":
             provider = (TheOddsAPIProvider(api_key=self.cfg.odds_api_key or "",
@@ -271,26 +277,40 @@ class ValueBettingBot:
 
     def place_bets(self, bets: List[ValueBet], dedup: bool = True
                    ) -> List[Tuple[ValueBet, PlacementResult]]:
-        """Log and place the given bets through the persistent executor,
-        skipping any opportunity already placed (so the continuous loop never
-        double-bets the same selection)."""
+        """Log and place the given bets through the persistent executor. With
+        ``dedup`` (the default) it places AT MOST ONE BET PER EVENT — skipping any
+        event that already has a placement, in this batch or a previous one."""
         executor = self.executor()
         results: List[Tuple[ValueBet, PlacementResult]] = []
+        placed_events = set()
         for bet in bets:
-            if dedup and self.store.already_placed(bet.key):
+            if dedup and (bet.event_id in placed_events
+                          or self.store.already_placed_event(bet.event_id)):
                 continue
             self.store.log_value_bet(bet)
             result = executor.place(bet)
             self.store.log_placement(result, bet)
             results.append((bet, result))
-            log.info("%s %s @ %.2f stake %.2f -> %s (%s)",
+            if result.ok:
+                placed_events.add(bet.event_id)
+            log.info("%s %s @ %.2f stake %.2f value %+.2f%% exp-CLV %+.2f%% -> %s (%s)",
                      bet.bookmaker, bet.selection, bet.price, bet.stake,
-                     result.status, result.message)
+                     bet.edge * 100, bet.exp_clv * 100, result.status, result.message)
         return results
+
+    def fair_price_for(self, event_id: str, selection: str) -> Optional[float]:
+        """Latest fair decimal price for a selection, from the most recent
+        matched boards. Used to snapshot the closing line for CLV at kickoff."""
+        for board in self._last_boards:
+            if board.event_id == event_id and board.fair_probs:
+                p = board.fair_probs.get(selection)
+                if p and p > 0:
+                    return 1.0 / p
+        return None
 
     # -- identify + place + log (one-shot) --------------------------------
     def run(self) -> List[Tuple[ValueBet, PlacementResult]]:
-        return self.place_bets(self.evaluate(), dedup=False)
+        return self.place_bets(self.evaluate())
 
     def keep_alive(self) -> None:
         if self._betfair is not None:
