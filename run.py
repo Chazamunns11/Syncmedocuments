@@ -136,6 +136,33 @@ def cmd_go(cfg: Config, args) -> int:
     return cmd_watch(cfg)
 
 
+def cmd_backtest(cfg: Config, args) -> int:
+    """Validate the strategy on historical data before risking money."""
+    from bot.backtest import (load_football_data, run_backtest, format_result,
+                              synthetic_rows)
+    if args.data:
+        rows = load_football_data(args.data)
+        print(f"Loaded {len(rows)} historical matches from {len(args.data)} path(s).")
+    else:
+        rows = synthetic_rows(n=args.synthetic)
+        print(f"No --data given; running on {len(rows)} SYNTHETIC matches "
+              f"(demo only, not real evidence).")
+    if not rows:
+        print("No usable rows found.")
+        return 1
+    res = run_backtest(
+        rows, method=cfg.truth_model if cfg.truth_model in ("weighted", "consensus")
+        else "weighted",
+        min_edge=cfg.min_edge, commission=args.commission,
+        devig_method=cfg.devig_method, consensus_alpha=cfg.consensus_alpha,
+        book_weights=cfg.book_weights, min_books=cfg.consensus_min_books,
+        flat_stake=(args.stake if args.stake else None),
+        bankroll=cfg.bankroll, kelly_multiplier=cfg.kelly_multiplier,
+        edge_haircut=cfg.edge_haircut)
+    print(format_result(res))
+    return 0
+
+
 def cmd_report(cfg: Config) -> int:
     bot = ValueBettingBot(cfg)
     try:
@@ -201,6 +228,14 @@ def main(argv=None) -> int:
                       help="min expected CLV to bet, e.g. 0.01 (default 0 = >0)")
     p_go.add_argument("--live", action="store_true",
                       help="place REAL bets on Betfair (default: paper)")
+    p_bt = sub.add_parser("backtest", help="validate the strategy on historical data")
+    p_bt.add_argument("--data", nargs="*", help="football-data.co.uk CSV path(s)/globs")
+    p_bt.add_argument("--commission", type=float, default=0.0,
+                      help="exchange commission to apply, e.g. 0.05")
+    p_bt.add_argument("--stake", type=float, default=1.0,
+                      help="flat stake per bet (0 = use Kelly)")
+    p_bt.add_argument("--synthetic", type=int, default=400,
+                      help="number of synthetic matches if no --data")
     sub.add_parser("report", help="show logged placements and P&L")
     p_settle = sub.add_parser("settle", help="mark a placed bet WON/LOST/VOID")
     p_settle.add_argument("--ref", required=True, help="external_ref of the placement")
@@ -221,6 +256,8 @@ def main(argv=None) -> int:
         return cmd_watch(cfg)
     if args.command == "go":
         return cmd_go(cfg, args)
+    if args.command == "backtest":
+        return cmd_backtest(cfg, args)
     if args.command == "report":
         return cmd_report(cfg)
     if args.command == "settle":
