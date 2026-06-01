@@ -133,6 +133,14 @@ def cmd_go(cfg: Config, args) -> int:
     if args.live:
         cfg.live = True
         cfg.executor = "betfair"
+    # Re-validate AFTER applying the flags (e.g. --live), and refuse to start
+    # real betting on any ERROR.
+    errors = [m for m in cfg.validate() if m.startswith("ERROR")]
+    for m in errors:
+        print(f"  config: {m}")
+    if errors:
+        print("Refusing to start: fix the ERROR(s) above.")
+        return 2
     return cmd_watch(cfg)
 
 
@@ -165,6 +173,85 @@ def cmd_backtest(cfg: Config, args) -> int:
         edge_haircut=cfg.edge_haircut)
     print(format_result(res))
     return 0
+
+
+def cmd_doctor(cfg: Config) -> int:
+    """Preflight checks: deps, config, credentials, connectivity, data, matching.
+    Run this before going live."""
+    ok = "PASS"; warn = "WARN"; fail = "FAIL"
+    results = []
+
+    def check(name, status, detail=""):
+        results.append((name, status, detail))
+
+    # 1) Config.
+    problems = cfg.validate()
+    errs = [m for m in problems if m.startswith("ERROR")]
+    check("config", fail if errs else ok,
+          "; ".join(errs) if errs else f"{len(problems)} note(s)")
+
+    # 2) Dependencies for the selected modes.
+    def has(mod):
+        try:
+            __import__(mod); return True
+        except ImportError:
+            return False
+    if cfg.pinnacle_source == "the_odds_api" or cfg.truth_model in ("weighted", "consensus", "blend"):
+        if cfg.pinnacle_source != "sample":
+            check("requests (odds API)", ok if has("requests") else fail,
+                  "" if has("requests") else "pip install requests")
+    if cfg.live and cfg.executor == "betfair":
+        check("betfairlightweight", ok if has("betfairlightweight") else fail,
+              "" if has("betfairlightweight") else "pip install betfairlightweight")
+
+    # 3) Credentials.
+    if cfg.pinnacle_source == "the_odds_api" or cfg.truth_model != "pinnacle":
+        if cfg.pinnacle_source != "sample":
+            check("ODDS_API_KEY", ok if cfg.odds_api_key else fail,
+                  "" if cfg.odds_api_key else "set ODDS_API_KEY in .env")
+    if cfg.live and cfg.executor == "betfair":
+        have = all([cfg.betfair_username, cfg.betfair_password, cfg.betfair_app_key])
+        check("Betfair credentials", ok if have else fail,
+              "" if have else "set BETFAIR_USERNAME/PASSWORD/APP_KEY")
+
+    # 4) Connectivity + data (best-effort).
+    bot = ValueBettingBot(cfg)
+    try:
+        try:
+            fair = bot._fair_lines()
+            check("truth feed", ok if fair else warn,
+                  f"{len(fair)} fair line(s)")
+        except Exception as exc:
+            check("truth feed", fail, str(exc)[:80])
+        try:
+            quotes = bot._venue_quotes()
+            check("venue feed", ok if quotes else warn,
+                  f"{len(quotes)} quote(s)")
+        except Exception as exc:
+            check("venue feed", fail, str(exc)[:80])
+        try:
+            boards = bot._boards()
+            check("event matching", ok if boards else warn,
+                  f"{len(boards)} matched event(s)")
+        except Exception as exc:
+            check("event matching", fail, str(exc)[:80])
+    finally:
+        bot.close()
+
+    print("\n=== Preflight (doctor) ===")
+    worst = ok
+    for name, status, detail in results:
+        mark = {"PASS": "✓", "WARN": "!", "FAIL": "✗"}[status]
+        print(f"  [{mark}] {name:24s} {status}{('  — ' + detail) if detail else ''}")
+        if status == fail:
+            worst = fail
+        elif status == warn and worst != fail:
+            worst = warn
+    if cfg.pinnacle_source == "sample":
+        print("  NOTE: running on SAMPLE data — switch pinnacle_source to "
+              "the_odds_api and venue_source to betfair for real betting.")
+    print(f"\n  Overall: {worst}")
+    return 0 if worst != fail else 1
 
 
 def cmd_status(cfg: Config) -> int:
@@ -285,6 +372,7 @@ def main(argv=None) -> int:
                       help="grid-search parameters and rank by CLV/yield")
     sub.add_parser("report", help="show logged placements and P&L")
     sub.add_parser("status", help="dashboard: bankroll, exposure, risk, CLV")
+    sub.add_parser("doctor", help="preflight checks before going live")
     p_settle = sub.add_parser("settle", help="mark a placed bet WON/LOST/VOID")
     p_settle.add_argument("--ref", required=True, help="external_ref of the placement")
     p_settle.add_argument("--result", required=True, choices=["WON", "LOST", "VOID"])
@@ -323,6 +411,8 @@ def main(argv=None) -> int:
         return cmd_report(cfg)
     if args.command == "status":
         return cmd_status(cfg)
+    if args.command == "doctor":
+        return cmd_doctor(cfg)
     if args.command == "settle":
         return cmd_settle(cfg, args.ref, args.result)
     return 1

@@ -54,10 +54,53 @@ python run.py go --budget 1000 --kelly 0.2         # or 20% Kelly sizing
 python run.py go --budget 1000 --stake 50 --live   # place REAL bets on Betfair
 
 # Other commands:
+python run.py backtest --data E0.csv      # validate the edge on real history
+python run.py backtest --sweep            # find the most profitable settings
+python run.py doctor     # preflight checks before going live
+python run.py status     # dashboard: bankroll, exposure, risk, CLV
 python run.py scan       # just show the value bets (taken value + expected CLV)
 python run.py report     # logged bets + P&L + taken value + CLV
 python run.py settle --ref paper-xxxx --result WON # settle a finished bet
 ```
+
+## Go-live runbook (do this in order — don't skip)
+
+The strategy is evidence-based, but profitability is **not** guaranteed and must
+be *earned through validation*. Follow this sequence:
+
+1. **Backtest on real data.** Download free season CSVs from
+   [football-data.co.uk](https://www.football-data.co.uk/) and run
+   `python run.py backtest --data "*.csv"`. Then `--sweep` to find the settings
+   with the best **CLV**. If average CLV isn't reliably **positive** here, stop —
+   there's no edge to harvest and no staking trick fixes that.
+2. **Wire up keys** in `.env` (`ODDS_API_KEY`, `BETFAIR_*`) and run
+   `python run.py doctor` until everything is PASS.
+3. **Dry-run live for 1–2 weeks**: in `config.yaml` set `pinnacle_source:
+   the_odds_api`, `venue_source: betfair`, `executor: betfair`, `live: true`,
+   `betfair_dry_run: true`. Run `python run.py go --budget 1000 --stake 10`.
+   **Verify every matched event by eye** in the logs and watch the **CLV-vs-market**
+   in `report`. This is the real test.
+4. **Go live tiny**: set `betfair_dry_run: false` and use `--stake 2`. Confirm
+   real fills and that `auto_settle` is settling from Betfair.
+5. **Scale slowly** only while CLV-vs-market stays positive over a few hundred
+   bets, and account for the **Premium Charge** (`betfair_premium_charge_rate`).
+
+Tip: a lower-commission exchange with **no premium charge** (e.g. Smarkets, ~2%)
+materially improves net returns — set `betfair_commission: 0.02` and
+`betfair_premium_charge_rate: 0` if you bet there.
+
+## Safety, risk & survival
+
+The bot is built to *survive variance* (the thing that kills most bettors):
+- **Circuit breakers** halt betting on a drawdown stop-loss, a bankroll floor, a
+  daily stake/bet-count cap, or too many open positions.
+- **Stake caps** to daily and open-exposure budgets, and to the liquidity
+  actually available (never assumes a better-than-top-of-book fill).
+- **Compounding bankroll** grows/shrinks with realised P&L (auto-settled from
+  Betfair), so Kelly scales with real results.
+- **Config validation + `doctor`** refuse to start live betting on misconfig.
+All tunable in `config.yaml` (`stop_loss_fraction`, `daily_stake_limit_fraction`,
+`max_open_bets`, `min_bankroll_fraction`, …).
 
 `go` runs continuously: it finds value, places **at most one bet per event** as
 close to kickoff as possible, logs the **taken value and expected CLV** of every
