@@ -212,13 +212,39 @@ class ValueBettingBot:
     def _fair_lines(self) -> List[FairLine]:
         sports = self.cfg.pinnacle_sports
         if len(sports) <= 1:
-            return self._fair_lines_for_sport(sports[0]) if sports else []
-        # Fetch sports concurrently to cut total latency near kickoff.
-        lines: List[FairLine] = []
-        with ThreadPoolExecutor(max_workers=min(8, len(sports))) as pool:
-            for res in pool.map(self._fair_lines_for_sport, sports):
-                lines.extend(res)
-        return lines
+            lines = self._fair_lines_for_sport(sports[0]) if sports else []
+        else:
+            # Fetch sports concurrently to cut total latency near kickoff.
+            lines = []
+            with ThreadPoolExecutor(max_workers=min(8, len(sports))) as pool:
+                for res in pool.map(self._fair_lines_for_sport, sports):
+                    lines.extend(res)
+        return self._drop_stale(lines)
+
+    def _drop_stale(self, lines: List[FairLine]) -> List[FairLine]:
+        """Discard fair lines older than max_line_age_seconds, so we never bet a
+        stale price. Lines without a timestamp are kept (can't judge)."""
+        max_age = self.cfg.max_line_age_seconds
+        if max_age <= 0:
+            return lines
+        import datetime as _dt
+        now = _dt.datetime.now(_dt.timezone.utc)
+        fresh = []
+        for fl in lines:
+            if not fl.last_update:
+                fresh.append(fl)
+                continue
+            try:
+                ts = _dt.datetime.fromisoformat(fl.last_update.replace("Z", "+00:00"))
+                if ts.tzinfo is None:
+                    ts = ts.replace(tzinfo=_dt.timezone.utc)
+                if (now - ts).total_seconds() <= max_age:
+                    fresh.append(fl)
+            except (ValueError, TypeError):
+                fresh.append(fl)
+        if len(fresh) < len(lines):
+            log.info("dropped %d stale line(s)", len(lines) - len(fresh))
+        return fresh
 
     # -- venue source: Betfair --------------------------------------------
     def _venue_quotes(self) -> List[VenueQuote]:
@@ -354,6 +380,21 @@ class ValueBettingBot:
                     if price:
                         return price
         return None
+
+    def guard_unmatched(self) -> int:
+        """Cancel resting (unmatched) Betfair orders so a stale limit bet can't be
+        'picked off' after the line moves. Live only. Returns count cancelled."""
+        if not (self.cfg.executor == "betfair" and self.cfg.live
+                and self.cfg.cancel_unmatched_in_play):
+            return 0
+        try:
+            unmatched = self._betfair_client().list_unmatched()
+            if unmatched:
+                self._betfair_client().cancel_orders()
+            return len(unmatched)
+        except Exception as exc:
+            log.error("guard_unmatched failed: %s", exc)
+            return 0
 
     def auto_settle(self) -> int:
         """Settle placed bets from Betfair cleared orders (live only). Returns

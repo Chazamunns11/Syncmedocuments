@@ -172,6 +172,11 @@ def cmd_report(cfg: Config) -> int:
         print(f"  total staked:   {_fmt_money(s['staked'])}")
         print(f"  settled:        won {s['won']}  lost {s['lost']}  pending {s['pending']}")
         print(f"  realised P&L:   {_fmt_money(s['profit'])}")
+        pc_rate = getattr(cfg, "betfair_premium_charge_rate", 0.0)
+        if pc_rate > 0 and s["profit"] > 0:
+            premium = pc_rate * s["profit"]
+            print(f"  Premium Charge: -{_fmt_money(premium)} ({pc_rate*100:.0f}%)")
+            print(f"  net of premium: {_fmt_money(s['profit'] - premium)}")
         print(f"  ROI (settled):  {s['roi']*100:+.2f}%")
         print(f"  avg taken value:{(s['avg_edge'] or 0)*100:+.2f}%")
         print(f"  avg exp CLV:    {(s['avg_exp_clv'] or 0)*100:+.2f}%")

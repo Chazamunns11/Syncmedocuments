@@ -155,6 +155,9 @@ class ContinuousRunner:
             except Exception as exc:  # never let one bad cycle kill the loop
                 log.error("cycle %d failed: %s", cycle, exc)
                 self._last_bets = []
+            # Cancel any resting unmatched orders each cycle so we aren't picked
+            # off after the line moves (live only; no-op otherwise).
+            self.bot.guard_unmatched()
             if self.keepalive_every_cycles and cycle % self.keepalive_every_cycles == 0:
                 self.bot.keep_alive()
                 # Hands-off settlement from Betfair cleared orders (live only).

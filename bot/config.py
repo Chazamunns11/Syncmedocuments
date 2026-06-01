@@ -54,6 +54,14 @@ class Config:
     betfair_competition_ids: List[str] = field(default_factory=list)
     betfair_commission: float = 0.05    # commission on net winnings (UK base 5%)
     betfair_market_start_within_hours: int = 72
+    # Betfair Premium Charge: up to 20-60% of profits for consistent winners.
+    # Set your applicable rate so reports show realistic net-of-premium P&L.
+    betfair_premium_charge_rate: float = 0.0
+    # Drop fair lines older than this many seconds (0 = disabled). Guards against
+    # betting a stale price. Requires the feed to provide last_update.
+    max_line_age_seconds: float = 0.0
+    # Cancel resting unmatched orders whose market has gone in-play (live only).
+    cancel_unmatched_in_play: bool = True
 
     # --- event matching (pinnacle <-> betfair) ---
     match_min_team_score: float = 0.80   # strict: avoid betting the wrong game
