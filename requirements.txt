@@ -1,0 +1,11 @@
+# Core runtime. The bot runs in offline/sample + paper mode with NO third-party
+# packages at all (pure stdlib). Install these to enable live data/placement.
+
+# Live odds from The Odds API (provider=the_odds_api)
+requests>=2.31
+
+# Reading config.yaml (the bot falls back to defaults+env if absent)
+PyYAML>=6.0
+
+# Real automated placement on the Betfair Exchange (executor=betfair)
+betfairlightweight>=2.19

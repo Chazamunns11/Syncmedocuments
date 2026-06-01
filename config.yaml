@@ -1,0 +1,38 @@
+# Value betting bot configuration.
+# Secrets (API keys, Betfair login) come from environment variables, NOT here.
+# See .env.example.
+
+# --- what to scan ---
+provider: sample            # "sample" (offline demo) or "the_odds_api"
+sports:
+  - soccer_epl
+markets:
+  - h2h                     # head-to-head / moneyline
+regions: uk,eu
+
+# --- value detection ---
+reference_books:            # sharp book(s) used to estimate the fair price
+  - pinnacle
+devig_method: multiplicative   # multiplicative | additive | shin
+min_edge: 0.02              # require >= 2% overlay vs fair price
+min_price: 1.30
+max_price: 15.0
+
+# --- staking / bankroll ---
+bankroll: 1000.0
+kelly_multiplier: 0.25      # quarter-Kelly (conservative)
+max_fraction_per_bet: 0.02  # never stake more than 2% of bankroll on one bet
+min_stake: 1.0
+max_stake: 100.0
+max_total_exposure_fraction: 0.10  # cap total staked per run at 10% of bankroll
+
+# --- execution ---
+executor: paper             # "paper" (safe default) or "betfair"
+live: false                 # MUST be true to place real bets via betfair
+paper_slippage: 0.0
+paper_fill_probability: 1.0
+betfair_dry_run: true       # resolve markets but don't send live orders
+
+# --- storage ---
+db_path: bets.db
+csv_path: bets.csv
