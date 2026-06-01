@@ -27,10 +27,14 @@ class TestBetfairLadder(unittest.TestCase):
 class TestMatcher(unittest.TestCase):
     def test_normalize_strips_noise(self):
         self.assertEqual(normalize("Arsenal FC"), "arsenal")
-        self.assertEqual(normalize("Manchester United"), "manchester")
+        # "United" is kept as a distinguishing token; aliases canonicalise.
+        self.assertEqual(normalize("Manchester United"), "manchester united")
+        self.assertEqual(normalize("Man Utd"), "manchester united")  # alias
+        self.assertEqual(normalize("Spurs"), "tottenham")            # alias
 
     def test_similarity(self):
         self.assertGreater(similarity("Arsenal", "Arsenal FC"), 0.8)
+        self.assertGreater(similarity("Man Utd", "Manchester United"), 0.9)  # alias
         self.assertLess(similarity("Arsenal", "Chelsea"), 0.5)
 
     def test_builds_aligned_boards(self):

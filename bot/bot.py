@@ -37,18 +37,27 @@ from .store import BetStore
 log = logging.getLogger("value_bot")
 
 
+def _pair_key(fl: FairLine) -> tuple:
+    """Source-independent event identity: the sorted normalised team pair."""
+    from .aliases import normalize
+    return tuple(sorted((normalize(fl.home_team), normalize(fl.away_team))))
+
+
 def _blend(pinnacle: List[FairLine], consensus: List[FairLine]) -> List[FairLine]:
-    """Average the pinnacle and weighted-consensus fair probabilities per event
-    (by event_key + selection). Events present in only one source are kept as-is."""
-    by_key = {fl.event_key: fl for fl in consensus}
+    """Average the pinnacle and weighted-consensus fair probabilities per event.
+
+    Events are matched across the two sources by normalised team pair (not raw
+    event key, which differs between feeds). Events in only one source are kept."""
+    by_pair = {_pair_key(fl): fl for fl in consensus}
     out: List[FairLine] = []
     used = set()
     for p in pinnacle:
-        c = by_key.get(p.event_key)
+        key = _pair_key(p)
+        c = by_pair.get(key)
         if c is None:
             out.append(p)
             continue
-        used.add(p.event_key)
+        used.add(key)
         sels = set(p.probs) | set(c.probs)
         probs = {}
         for s in sels:
@@ -61,7 +70,7 @@ def _blend(pinnacle: List[FairLine], consensus: List[FairLine]) -> List[FairLine
             away_team=p.away_team, market=p.market, probs=probs,
             source="blend", last_update=p.last_update,
             overround=(sum(overs) / len(overs)) if overs else None))
-    out.extend(c for k, c in by_key.items() if k not in used)
+    out.extend(c for k, c in by_pair.items() if k not in used)
     return out
 
 
@@ -230,6 +239,7 @@ class ValueBettingBot:
             boards = EventMatcher(
                 min_team_score=self.cfg.match_min_team_score,
                 start_window_minutes=self.cfg.match_start_window_minutes,
+                ambiguity_margin=self.cfg.match_ambiguity_margin,
             ).build_boards(fair, quotes)
             log.info("pinnacle lines=%d, betfair quotes=%d -> %d matched boards",
                      len(fair), len(quotes), len(boards))

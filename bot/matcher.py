@@ -13,31 +13,22 @@ Feeding these boards to ``ValueDetector(reference_books=["pinnacle"],
 commission=...)`` then yields +EV Betfair bets, reusing all the tested value
 logic.
 
-Name matching is inherently fuzzy. Tune ``min_team_score`` and
-``start_window_minutes``, and review matches (especially before live placement).
+Matching is alias-aware and STRICT: it requires both teams to match well in a
+consistent home/away orientation, and rejects ambiguous matches (where a second
+Pinnacle event is almost as good a fit) — because betting the wrong game is the
+worst failure mode for real money. Tune ``min_team_score``, ``ambiguity_margin``
+and ``start_window_minutes``.
 """
 from __future__ import annotations
 
 import datetime as dt
-import difflib
-import re
-from typing import Dict, List, Optional
+import logging
+from typing import Dict, List, Optional, Tuple
 
+from .aliases import normalize, similarity  # noqa: F401 (re-exported)
 from .models import BookOdds, FairLine, MarketBoard, Outcome, VenueQuote
 
-_NOISE = re.compile(r"\b(fc|cf|afc|sc|club|the|city|united|utd|town)\b")
-_NONWORD = re.compile(r"[^a-z0-9 ]")
-
-
-def normalize(name: str) -> str:
-    s = name.lower().strip()
-    s = _NONWORD.sub(" ", s)
-    s = _NOISE.sub(" ", s)
-    return re.sub(r"\s+", " ", s).strip()
-
-
-def similarity(a: str, b: str) -> float:
-    return difflib.SequenceMatcher(None, normalize(a), normalize(b)).ratio()
+log = logging.getLogger("value_bot.matcher")
 
 
 def _parse_time(s: str) -> Optional[dt.datetime]:
@@ -57,15 +48,20 @@ def _within_window(a: str, b: str, minutes: int) -> bool:
 
 
 class EventMatcher:
-    def __init__(self, min_team_score: float = 0.6, start_window_minutes: int = 90):
+    def __init__(self, min_team_score: float = 0.80,
+                 start_window_minutes: int = 90, ambiguity_margin: float = 0.08):
         self.min_team_score = min_team_score
         self.start_window_minutes = start_window_minutes
+        # Reject a match if a second candidate event scores within this margin of
+        # the best — i.e. the match is ambiguous and could be the wrong game.
+        self.ambiguity_margin = ambiguity_margin
 
     def _event_score(self, fl: FairLine, quotes: List[VenueQuote]) -> float:
         q = quotes[0]
         if not _within_window(fl.commence_time, q.commence_time, self.start_window_minutes):
             return 0.0
-        # Score both home/away orderings; teams may be swapped across sources.
+        # Require BOTH teams to match in a consistent orientation (teams may be
+        # listed home/away in either order across sources).
         straight = min(similarity(fl.home_team, q.home_team),
                        similarity(fl.away_team, q.away_team))
         swapped = min(similarity(fl.home_team, q.away_team),
@@ -94,13 +90,19 @@ class EventMatcher:
 
         boards: List[MarketBoard] = []
         for market_id, mkt_quotes in by_market.items():
-            # Find the best-matching Pinnacle fair line for this Betfair market.
-            best_fl, best_score = None, 0.0
-            for fl in fair_lines:
-                score = self._event_score(fl, mkt_quotes)
-                if score > best_score:
-                    best_fl, best_score = fl, score
-            if best_fl is None or best_score < self.min_team_score:
+            # Rank candidate Pinnacle lines for this Betfair market.
+            scored: List[Tuple[float, FairLine]] = sorted(
+                ((self._event_score(fl, mkt_quotes), fl) for fl in fair_lines),
+                key=lambda t: t[0], reverse=True)
+            if not scored or scored[0][0] < self.min_team_score:
+                continue
+            best_score, best_fl = scored[0]
+            # Ambiguity guard: if the runner-up is almost as good a fit, we can't
+            # be sure which game this is — skip rather than risk the wrong bet.
+            if len(scored) > 1 and scored[1][0] >= best_score - self.ambiguity_margin \
+                    and scored[1][1].event_key != best_fl.event_key:
+                log.warning("ambiguous match for %s (%.2f vs %.2f) - skipping",
+                            mkt_quotes[0].event_name, best_score, scored[1][0])
                 continue
 
             pinnacle_outcomes = [

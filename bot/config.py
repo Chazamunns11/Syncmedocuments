@@ -56,8 +56,9 @@ class Config:
     betfair_market_start_within_hours: int = 72
 
     # --- event matching (pinnacle <-> betfair) ---
-    match_min_team_score: float = 0.6
+    match_min_team_score: float = 0.80   # strict: avoid betting the wrong game
     match_start_window_minutes: int = 90
+    match_ambiguity_margin: float = 0.08  # reject if 2nd-best match is this close
 
     # --- value detection ---
     reference_books: List[str] = field(default_factory=lambda: ["pinnacle"])
