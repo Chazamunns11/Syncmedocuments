@@ -71,6 +71,11 @@ _MIGRATIONS = {
         ("fair_price", "REAL"), ("edge", "REAL"), ("eff_price", "REAL"),
         ("exp_clv", "REAL"), ("closing_fair_price", "REAL"), ("clv", "REAL"),
         ("event_id", "TEXT"),
+        # True closing line value: against the venue's OWN closing price
+        # (Betfair near-off back price), the gold-standard CLV for an exchange
+        # bettor, alongside the model-based closing fair price.
+        ("closing_market_price", "REAL"), ("clv_market", "REAL"),
+        ("commission", "REAL"),
     ],
 }
 
@@ -162,12 +167,18 @@ class BetStore:
             "AND closing_fair_price IS NULL AND external_ref IS NOT NULL"
         ).fetchall()
 
-    def record_closing(self, external_ref: str, closing_fair_price: float
+    def record_closing(self, external_ref: str, closing_fair_price: float,
+                       closing_market_price: Optional[float] = None
                        ) -> Optional[float]:
-        """Record the closing fair price (e.g. Pinnacle de-vigged price at
-        kickoff) and compute Closing Line Value: clv = taken_price /
-        closing_fair_price - 1. Positive CLV is the strongest predictor of a
-        genuine long-term edge. Returns the CLV, or None if not found."""
+        """Record the closing line and compute Closing Line Value.
+
+        * ``clv`` = taken_price / closing_fair_price - 1  (vs our model's fair
+          price at kickoff).
+        * ``clv_market`` = taken_price / closing_market_price - 1  (vs the venue's
+          OWN closing back price — the gold standard for an exchange bettor).
+
+        Positive CLV is the strongest predictor of a genuine long-term edge.
+        Returns the model CLV, or None if not found."""
         row = self._conn.execute(
             "SELECT matched_price, requested_price FROM placements "
             "WHERE external_ref = ?", (external_ref,),
@@ -176,12 +187,38 @@ class BetStore:
             return None
         taken = row["matched_price"] or row["requested_price"]
         clv = taken / closing_fair_price - 1.0
+        clv_market = (taken / closing_market_price - 1.0
+                      if closing_market_price else None)
         self._conn.execute(
-            "UPDATE placements SET closing_fair_price=?, clv=? WHERE external_ref=?",
-            (closing_fair_price, clv, external_ref),
+            "UPDATE placements SET closing_fair_price=?, clv=?, "
+            "closing_market_price=?, clv_market=? WHERE external_ref=?",
+            (closing_fair_price, clv, closing_market_price, clv_market, external_ref),
         )
         self._conn.commit()
         return clv
+
+    def settle_from_betfair(self, cleared) -> int:
+        """Settle placements from Betfair cleared-order reports (hands-off).
+        Each item must expose bet_id and profit. Matches on external_ref =
+        bet_id. Returns the number settled."""
+        n = 0
+        for o in cleared:
+            bet_id = getattr(o, "bet_id", None) or (
+                o.get("betId") if isinstance(o, dict) else None)
+            profit = getattr(o, "profit", None)
+            if profit is None and isinstance(o, dict):
+                profit = o.get("profit")
+            if bet_id is None or profit is None:
+                continue
+            outcome = "WON" if profit > 0 else ("LOST" if profit < 0 else "VOID")
+            cur = self._conn.execute(
+                "UPDATE placements SET settlement=?, profit=?, settled_at=? "
+                "WHERE external_ref=? AND settlement='PENDING'",
+                (outcome, float(profit), utcnow_iso(), str(bet_id)),
+            )
+            n += cur.rowcount
+        self._conn.commit()
+        return n
 
     def _append_csv(self, result: PlacementResult) -> None:
         new = not os.path.exists(self.csv_path)
@@ -251,14 +288,41 @@ class BetStore:
                  AVG(edge) AS avg_edge,
                  AVG(exp_clv) AS avg_exp_clv,
                  AVG(clv) AS avg_clv,
+                 AVG(clv_market) AS avg_clv_market,
                  COALESCE(SUM(CASE WHEN clv > 0 THEN 1 ELSE 0 END),0) AS clv_beat,
-                 COALESCE(SUM(CASE WHEN clv IS NOT NULL THEN 1 ELSE 0 END),0) AS clv_n
+                 COALESCE(SUM(CASE WHEN clv IS NOT NULL THEN 1 ELSE 0 END),0) AS clv_n,
+                 COALESCE(SUM(CASE WHEN clv_market > 0 THEN 1 ELSE 0 END),0) AS clv_mkt_beat,
+                 COALESCE(SUM(CASE WHEN clv_market IS NOT NULL THEN 1 ELSE 0 END),0) AS clv_mkt_n
                FROM placements WHERE status IN ('PLACED','MATCHED','DRY_RUN')"""
         ).fetchone()
         d = dict(row)
         d["roi"] = (d["profit"] / d["settled_stake"]) if d["settled_stake"] else 0.0
         d["clv_beat_rate"] = (d["clv_beat"] / d["clv_n"]) if d["clv_n"] else 0.0
+        d["clv_mkt_beat_rate"] = (d["clv_mkt_beat"] / d["clv_mkt_n"]) if d["clv_mkt_n"] else 0.0
         return d
+
+    def realised_profit(self) -> float:
+        """Total settled profit across all placements (for live bankroll)."""
+        row = self._conn.execute(
+            "SELECT COALESCE(SUM(profit),0) AS p FROM placements "
+            "WHERE settlement != 'PENDING'").fetchone()
+        return float(row["p"] or 0.0)
+
+    def staked_since(self, iso_time: str) -> float:
+        """Total stake placed since an ISO timestamp (for daily caps)."""
+        row = self._conn.execute(
+            "SELECT COALESCE(SUM(requested_stake),0) AS s FROM placements "
+            "WHERE placed_at >= ? AND status IN ('PLACED','MATCHED','DRY_RUN')",
+            (iso_time,)).fetchone()
+        return float(row["s"] or 0.0)
+
+    def count_open(self) -> int:
+        """Placements not yet settled (open exposure positions)."""
+        row = self._conn.execute(
+            "SELECT COUNT(*) AS n FROM placements "
+            "WHERE settlement='PENDING' AND status IN ('PLACED','MATCHED')"
+        ).fetchone()
+        return int(row["n"] or 0)
 
     def close(self) -> None:
         self._conn.close()

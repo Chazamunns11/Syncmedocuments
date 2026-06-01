@@ -149,11 +149,15 @@ def cmd_report(cfg: Config) -> int:
         print(f"  avg taken value:{(s['avg_edge'] or 0)*100:+.2f}%")
         print(f"  avg exp CLV:    {(s['avg_exp_clv'] or 0)*100:+.2f}%")
         if s["clv_n"]:
-            print(f"  realised CLV:   avg {(s['avg_clv'] or 0)*100:+.2f}%  "
-                  f"beat close {s['clv_beat']}/{s['clv_n']} "
+            print(f"  CLV vs model:   avg {(s['avg_clv'] or 0)*100:+.2f}%  "
+                  f"beat {s['clv_beat']}/{s['clv_n']} "
                   f"({s['clv_beat_rate']*100:.0f}%)")
-        else:
-            print("  realised CLV:   (none captured yet — recorded at kickoff)")
+        if s["clv_mkt_n"]:
+            print(f"  CLV vs market:  avg {(s['avg_clv_market'] or 0)*100:+.2f}%  "
+                  f"beat {s['clv_mkt_beat']}/{s['clv_mkt_n']} "
+                  f"({s['clv_mkt_beat_rate']*100:.0f}%)   <- the real scoreboard")
+        if not s["clv_n"] and not s["clv_mkt_n"]:
+            print("  CLV:            (none captured yet — recorded at kickoff)")
         print("\n=== Recent placements ===")
         for row in bot.store.recent_placements(limit=20):
             print(f"  {row['placed_at'][:19]} {row['status']:8s} "

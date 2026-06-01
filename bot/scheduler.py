@@ -132,11 +132,15 @@ class ContinuousRunner:
                     continue  # not close enough to kickoff yet
             selection = (row["bet_key"].split("|") + ["", "", ""])[2]
             fair = self.bot.fair_price_for(event_id, selection)
+            market = self.bot.market_price_for(event_id, selection)
             if fair:
-                clv = store.record_closing(row["external_ref"], fair)
+                clv = store.record_closing(row["external_ref"], fair,
+                                           closing_market_price=market)
                 if clv is not None:
                     recorded += 1
-                    log.info("CLV recorded for %s: %+.2f%%", selection, clv * 100)
+                    log.info("CLV recorded for %s: vs fair %+.2f%% (market close %s)",
+                             selection, clv * 100,
+                             f"{market:.2f}" if market else "n/a")
         return recorded
 
     def run(self) -> None:
@@ -153,6 +157,10 @@ class ContinuousRunner:
                 self._last_bets = []
             if self.keepalive_every_cycles and cycle % self.keepalive_every_cycles == 0:
                 self.bot.keep_alive()
+                # Hands-off settlement from Betfair cleared orders (live only).
+                settled = self.bot.auto_settle()
+                if settled:
+                    log.info("auto-settled %d bet(s) from Betfair", settled)
             if self.max_cycles is not None and cycle >= self.max_cycles:
                 break
             self.sleep_fn(self._next_sleep(getattr(self, "_last_bets", [])))

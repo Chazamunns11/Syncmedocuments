@@ -308,6 +308,41 @@ class ValueBettingBot:
                     return 1.0 / p
         return None
 
+    def market_price_for(self, event_id: str, selection: str) -> Optional[float]:
+        """Latest venue (Betfair) back price for a selection — used to capture
+        the market's OWN closing price for true CLV."""
+        for board in self._last_boards:
+            if board.event_id != event_id:
+                continue
+            for book in board.books:
+                if book.bookmaker == "betfair":
+                    price = book.price_for(selection)
+                    if price:
+                        return price
+        return None
+
+    def auto_settle(self) -> int:
+        """Settle placed bets from Betfair cleared orders (live only). Returns
+        the number newly settled; also refreshes the live bankroll."""
+        if not (self.cfg.executor == "betfair" and self.cfg.live):
+            return 0
+        try:
+            cleared = self._betfair_client().list_cleared_orders()
+            n = self.store.settle_from_betfair(cleared)
+            if n:
+                self.refresh_bankroll()
+            return n
+        except Exception as exc:
+            log.error("auto-settle failed: %s", exc)
+            return 0
+
+    def refresh_bankroll(self) -> float:
+        """Update the working bankroll to starting bank + realised profit, so
+        Kelly stakes compound on actual results."""
+        bank = self.cfg.bankroll + self.store.realised_profit()
+        self.bankroll.bankroll = max(0.01, bank)
+        return self.bankroll.bankroll
+
     # -- identify + place + log (one-shot) --------------------------------
     def run(self) -> List[Tuple[ValueBet, PlacementResult]]:
         return self.place_bets(self.evaluate())

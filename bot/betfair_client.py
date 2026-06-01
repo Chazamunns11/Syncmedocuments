@@ -227,6 +227,16 @@ class BetfairClient:
         client = self.trading()
         return client.betting.cancel_orders(market_id=market_id)
 
+    def list_cleared_orders(self, bet_ids: Optional[List[str]] = None):
+        """Settled (cleared) orders with realised profit, for hands-off
+        settlement. Returns the list of cleared-order objects."""
+        client = self.trading()
+        kwargs = dict(bet_status="SETTLED")
+        if bet_ids:
+            kwargs["bet_ids"] = bet_ids
+        resp = client.betting.list_cleared_orders(**kwargs)
+        return getattr(resp, "orders", [])
+
     def place_back(
         self,
         market_id: str,
