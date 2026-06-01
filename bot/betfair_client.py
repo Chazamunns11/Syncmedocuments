@@ -212,6 +212,21 @@ class BetfairClient:
         return quotes
 
     # -- placement ---------------------------------------------------------
+    def list_unmatched(self, market_ids: Optional[List[str]] = None):
+        """Current orders still resting (unmatched). Used by POD-style line-move
+        protection to find bets to pull before they get picked off."""
+        client = self.trading()
+        resp = client.betting.list_current_orders(
+            market_ids=market_ids, order_projection="EXECUTABLE")
+        return getattr(resp, "orders", [])
+
+    def cancel_orders(self, market_id: Optional[str] = None):
+        """Cancel resting (unmatched) orders — all, or for one market. Call this
+        when the sharp (Pinnacle) line moves against an unmatched bet so you are
+        not 'picked off'."""
+        client = self.trading()
+        return client.betting.cancel_orders(market_id=market_id)
+
     def place_back(
         self,
         market_id: str,

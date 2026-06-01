@@ -55,6 +55,7 @@ def _fair_line_from_three_way(
         event_key=str(event_key), sport_key=sport_key, commence_time=str(commence),
         home_team=home, away_team=away, market="h2h",
         probs={n: p for (n, _), p in zip(pairs, probs)}, source="pinnacle",
+        overround=sum(1.0 / o for _, o in pairs),
     )
 
 
@@ -150,6 +151,7 @@ def pinnacle_lines_via_odds_api(
                 away_team=board.away_team, market="h2h",
                 probs=dict(zip(names, probs)), source="pinnacle",
                 last_update=pin.last_update,
+                overround=sum(1.0 / o for o in odds),
             )
         )
     return lines

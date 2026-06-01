@@ -135,17 +135,26 @@ class ValueDetector:
         return 1.0 + (price - 1.0) * (1.0 - self.commission)
 
     def detect_board(self, board: MarketBoard) -> List[ValueBet]:
-        result = _fair_probs(board, self.reference_books, self.devig_method)
-        if not result:
-            return []
-        fair, overround = result
-        # Reject markets whose reference line is too wide to trust.
-        if overround > self.max_overround:
+        # Prefer final fair probabilities supplied by the truth model (Pinnacle /
+        # weighted consensus / Kaunitz); otherwise de-vig a reference book.
+        if board.fair_probs:
+            fair = board.fair_probs
+            overround = board.overround
+        else:
+            result = _fair_probs(board, self.reference_books, self.devig_method)
+            if not result:
+                return []
+            fair, overround = result
+        # Reject markets whose underlying truth line is too wide to trust.
+        if overround is not None and overround > self.max_overround:
             return []
 
         found: List[ValueBet] = []
         for book in board.books:
             if book.bookmaker.lower() in self.exclude_books:
+                continue
+            # Never bet against the truth book itself.
+            if board.fair_source and book.bookmaker == board.fair_source:
                 continue
             for outcome in book.outcomes:
                 p = fair.get(outcome.name)

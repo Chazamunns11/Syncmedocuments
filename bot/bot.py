@@ -23,16 +23,46 @@ from typing import List, Optional, Tuple
 from .bankroll import BankrollManager
 from .betfair_client import EVENT_TYPE_IDS, BetfairClient
 from .config import Config
+from .consensus import consensus_lines_from_boards, consensus_lines_via_odds_api
 from .execution import PaperExecutor
 from .execution.base import Executor
 from .matcher import EventMatcher
 from .models import FairLine, MarketBoard, PlacementResult, ValueBet, VenueQuote
 from .pinnacle import PinnacleClient, pinnacle_lines_via_odds_api
 from .providers import SampleProvider, TheOddsAPIProvider
-from .samples import sample_betfair_quotes, sample_pinnacle_lines
+from .samples import (sample_betfair_quotes, sample_multibook_boards,
+                      sample_pinnacle_lines)
 from .store import BetStore
 
 log = logging.getLogger("value_bot")
+
+
+def _blend(pinnacle: List[FairLine], consensus: List[FairLine]) -> List[FairLine]:
+    """Average the pinnacle and weighted-consensus fair probabilities per event
+    (by event_key + selection). Events present in only one source are kept as-is."""
+    by_key = {fl.event_key: fl for fl in consensus}
+    out: List[FairLine] = []
+    used = set()
+    for p in pinnacle:
+        c = by_key.get(p.event_key)
+        if c is None:
+            out.append(p)
+            continue
+        used.add(p.event_key)
+        sels = set(p.probs) | set(c.probs)
+        probs = {}
+        for s in sels:
+            vals = [v for v in (p.probs.get(s), c.probs.get(s)) if v is not None]
+            probs[s] = sum(vals) / len(vals)
+        overs = [o for o in (p.overround, c.overround) if o is not None]
+        out.append(FairLine(
+            event_key=p.event_key, sport_key=p.sport_key,
+            commence_time=p.commence_time, home_team=p.home_team,
+            away_team=p.away_team, market=p.market, probs=probs,
+            source="blend", last_update=p.last_update,
+            overround=(sum(overs) / len(overs)) if overs else None))
+    out.extend(c for k, c in by_key.items() if k not in used)
+    return out
 
 
 def build_executor(cfg: Config, betfair_client: Optional[BetfairClient] = None) -> Executor:
@@ -100,10 +130,12 @@ class ValueBettingBot:
             )
         return self._betfair
 
-    # -- truth source: Pinnacle -------------------------------------------
-    def _fair_lines_for_sport(self, sport: str) -> List[FairLine]:
+    # -- source of truth (fair probabilities) -----------------------------
+    def _pinnacle_lines_for_sport(self, sport: str) -> List[FairLine]:
         src = self.cfg.pinnacle_source
         try:
+            if src == "sample":
+                return sample_pinnacle_lines(sport)
             if src == "the_odds_api":
                 return pinnacle_lines_via_odds_api(
                     api_key=self.cfg.odds_api_key or "", sport_key=sport,
@@ -118,9 +150,39 @@ class ValueBettingBot:
             log.error("pinnacle fetch failed for %s: %s", sport, exc)
             return []
 
+    def _consensus_lines_for_sport(self, sport: str, method: str) -> List[FairLine]:
+        alpha = {r: self.cfg.consensus_alpha for r in ("home", "draw", "away")}
+        try:
+            if self.cfg.pinnacle_source == "sample":
+                return consensus_lines_from_boards(
+                    sample_multibook_boards(sport), method=method,
+                    book_weights=self.cfg.book_weights,
+                    devig_method=self.cfg.devig_method, alpha=alpha,
+                    min_books=self.cfg.consensus_min_books)
+            return consensus_lines_via_odds_api(
+                api_key=self.cfg.odds_api_key or "", sport_key=sport,
+                regions=self.cfg.regions, method=method,
+                book_weights=self.cfg.book_weights,
+                devig_method=self.cfg.devig_method, alpha=alpha,
+                min_books=self.cfg.consensus_min_books)
+        except Exception as exc:
+            log.error("consensus fetch failed for %s: %s", sport, exc)
+            return []
+
+    def _fair_lines_for_sport(self, sport: str) -> List[FairLine]:
+        model = self.cfg.truth_model
+        if model == "pinnacle":
+            return self._pinnacle_lines_for_sport(sport)
+        if model == "weighted":
+            return self._consensus_lines_for_sport(sport, "weighted")
+        if model == "consensus":
+            return self._consensus_lines_for_sport(sport, "kaunitz")
+        if model == "blend":
+            return _blend(self._pinnacle_lines_for_sport(sport),
+                          self._consensus_lines_for_sport(sport, "weighted"))
+        raise ValueError(f"unknown truth_model {model!r}")
+
     def _fair_lines(self) -> List[FairLine]:
-        if self.cfg.pinnacle_source == "sample":
-            return sample_pinnacle_lines(self.cfg.pinnacle_sports[0])
         sports = self.cfg.pinnacle_sports
         if len(sports) <= 1:
             return self._fair_lines_for_sport(sports[0]) if sports else []

@@ -10,7 +10,7 @@ import datetime as _dt
 from typing import List
 
 from .devig import devig
-from .models import FairLine, VenueQuote
+from .models import BookOdds, FairLine, MarketBoard, Outcome, VenueQuote
 
 
 def _soon(seconds: float) -> str:
@@ -37,6 +37,7 @@ def sample_pinnacle_lines(sport_key: str = "soccer_epl") -> List[FairLine]:
         commence_time=_T1,
         home_team="Arsenal", away_team="Chelsea", market="h2h",
         probs=dict(zip(names, probs)), source="pinnacle",
+        overround=sum(1.0 / o for o in odds),
     ))
     # An efficient event: Betfair will sit on/under fair -> no value.
     names2 = ["Liverpool", "Draw", "Everton"]
@@ -47,8 +48,36 @@ def sample_pinnacle_lines(sport_key: str = "soccer_epl") -> List[FairLine]:
         commence_time=_T2,
         home_team="Liverpool", away_team="Everton", market="h2h",
         probs=dict(zip(names2, probs2)), source="pinnacle",
+        overround=sum(1.0 / o for o in odds2),
     ))
     return lines
+
+
+def sample_multibook_boards(sport_key: str = "soccer_epl") -> List[MarketBoard]:
+    """A full multi-bookmaker market (offline) for the consensus truth models.
+    Same two events as the Pinnacle/Betfair samples so they match up."""
+    def board(eid, home, away, when, rows):
+        books = [BookOdds(name, "h2h",
+                          [Outcome(s, o) for s, o in zip(("H", "D", "A"), odds)])
+                 for name, odds in rows]
+        # Relabel generic H/D/A to real names.
+        for bk in books:
+            bk.outcomes[0].name, bk.outcomes[1].name, bk.outcomes[2].name = \
+                home, "Draw", away
+        return MarketBoard(eid, sport_key, when, home, away, "h2h", books=books)
+
+    return [
+        board("evt_1", "Arsenal", "Chelsea", _T1, [
+            ("pinnacle",    (1.95, 3.60, 4.20)),
+            ("softbook",    (2.05, 3.50, 4.00)),
+            ("anotherbook", (2.00, 3.55, 4.10)),
+        ]),
+        board("evt_2", "Liverpool", "Everton", _T2, [
+            ("pinnacle",    (1.50, 4.20, 7.00)),
+            ("softbook",    (1.49, 4.10, 6.80)),
+            ("anotherbook", (1.50, 4.15, 6.90)),
+        ]),
+    ]
 
 
 def sample_betfair_quotes() -> List[VenueQuote]:

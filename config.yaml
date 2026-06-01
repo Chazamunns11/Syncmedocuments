@@ -8,8 +8,21 @@
 # multi_book       : classic cross-bookmaker value scan from a single odds feed.
 mode: pinnacle_betfair
 
-# === source of truth: Pinnacle ===
+# === source of truth (fair probability model) ===
+# weighted : weighted Power-Method consensus across sharp + soft books
+#            (practitioner method, validated; most accurate default)
+# pinnacle : single sharp book (Pinnacle), de-vigged
+# consensus: Kaunitz et al. -> 1/mean(odds) - alpha  (bias corrected)
+# blend    : average of pinnacle and weighted estimates
+truth_model: weighted
+book_weights:                  # weight sharp books higher in the consensus
+  pinnacle: 3.0
+  _default: 1.0
+consensus_min_books: 3         # min bookmakers required to form a consensus
+consensus_alpha: 0.05          # Kaunitz bias term (used by truth_model: consensus)
+
 pinnacle_source: sample        # sample | the_odds_api | direct
+                               # also selects the data feed for weighted/consensus
 pinnacle_sports:
   - soccer_epl                 # odds-api sport key (the_odds_api/sample);
                                # use "soccer" etc. for pinnacle_source: direct
@@ -45,7 +58,7 @@ min_seconds_before_start: 20   # stop placing this close to kickoff (avoid in-pl
 
 # === staking / bankroll ===
 bankroll: 1000.0
-kelly_multiplier: 0.25         # quarter-Kelly (conservative)
+kelly_multiplier: 0.20         # 15-20% Kelly is the practitioner range
 max_fraction_per_bet: 0.02
 min_stake: 1.0
 max_stake: 100.0

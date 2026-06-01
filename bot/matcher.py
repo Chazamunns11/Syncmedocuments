@@ -128,10 +128,16 @@ class EventMatcher:
                     away_team=best_fl.away_team,
                     market="h2h",
                     books=[
-                        BookOdds("pinnacle", "h2h", pinnacle_outcomes),
+                        # The truth book is kept for transparency/record; the
+                        # detector uses fair_probs directly (so consensus models
+                        # that already bias-correct aren't re-de-vigged).
+                        BookOdds(best_fl.source, "h2h", pinnacle_outcomes),
                         BookOdds("betfair", "h2h", betfair_outcomes,
                                  market_id=market_id),
                     ],
+                    fair_probs=dict(best_fl.probs),
+                    fair_source=best_fl.source,
+                    overround=best_fl.overround,
                 )
             )
         return boards

@@ -5,14 +5,17 @@ and **logs** every one — built for the realistic case where you're limited or
 banned on the soft bookmakers.
 
 **The core idea:**
-- **Pinnacle is the source of truth.** It's the sharpest mainstream book: it
-  prices close to true probability and welcomes winners. We strip its margin
-  ("de-vig") to get a **fair probability** for each outcome.
+- **A fair probability comes from the market's own numbers.** By default a
+  **weighted Power-Method consensus** of many bookmakers (sharp books like
+  Pinnacle weighted higher) — the "wisdom of crowds" that, in peer-reviewed work,
+  predicts outcomes with R²≈0.99. You can also use Pinnacle alone or the Kaunitz
+  α-corrected consensus (`truth_model`).
 - **Betfair Exchange is where you actually bet.** An exchange doesn't ban or
   limit winners — you bet against other punters and Betfair takes commission on
   net winnings. It also has an **official API that permits automation**.
-- **The bet:** wherever Betfair's back price beats Pinnacle's fair price by your
-  threshold *after commission*, that's a +EV value bet — place it on Betfair.
+- **The bet:** wherever Betfair's back price beats the fair price by your
+  threshold *after commission*, that's a +EV value bet — place it on Betfair,
+  as close to kickoff as possible.
 
 > Runs out of the box on **offline sample data** in **paper mode** with **zero
 > third-party dependencies**. Try it before wiring up any account.
@@ -70,7 +73,7 @@ Sample-mode `scan` output:
 
 | Stage | Module | What it does |
 |-------|--------|--------------|
-| Truth | `bot/pinnacle.py` | Pinnacle line → de-vig → `FairLine` (fair prob per selection). Via The Odds API or direct. |
+| Truth | `bot/pinnacle.py`, `bot/consensus.py` | Fair probability per selection — Pinnacle, weighted multi-book consensus, or Kaunitz (`truth_model`). |
 | Venue | `bot/betfair_client.py` | One Betfair session: best back prices **and** placement, sharing market/selection ids. |
 | Match | `bot/matcher.py` | Pair Pinnacle ↔ Betfair events by team-name similarity + start time; align runners; build two-book `MarketBoard`s. |
 | Identify | `bot/value.py` + `bot/devig.py` | Fair price from Pinnacle; flag Betfair prices that beat it by ≥ `min_edge` **after commission**; EV + Kelly. |
@@ -83,11 +86,48 @@ A winning back bet at decimal odds `o` returns `(o-1)·(1-commission)` profit. T
 detector values the **commission-adjusted** price, so it only fires when the edge
 survives Betfair's rake (`betfair_commission`, UK base 5%).
 
-### Why a sharp reference?
-Pinnacle prices near true probability and accepts big bets, so its de-vigged line
-is the cheapest good estimate of "truth". De-vig methods: `power` (default) and
-`shin` both correct favourite–longshot bias and are the most accurate;
-`multiplicative` and `additive` are simpler baselines — see `bot/devig.py`.
+### Truth models (how the fair probability is estimated)
+Set `truth_model`:
+
+| Model | Method | Notes |
+|-------|--------|-------|
+| **`weighted`** (default) | De-vig **each** book with the Power Method, then take a **weighted average** of the probabilities (sharp books weighted higher via `book_weights`). | The practitioner approach; "wisdom of crowds" + sharp anchoring. |
+| `pinnacle` | Single sharp book (Pinnacle), de-vigged. | Simple, robust. |
+| `consensus` | **Kaunitz et al.**: `p = 1/mean(odds across ≥N books) − α` per outcome. | Faithful to the paper; α is a bias correction. |
+| `blend` | Average of `pinnacle` and `weighted`. | Hedge between the two truth signals. |
+
+De-vig methods (`devig_method`): `power` (default) and `shin` both correct
+favourite–longshot bias; `multiplicative`/`additive` are simpler baselines.
+
+### Research-backed methodology
+This is not guesswork — the strategy mirrors two independent, validated sources:
+
+- **Kaunitz, Zhong & Kreiner (2017), "Beating the bookies with their own
+  numbers"** — over **479,440 games** the consensus of bookmaker odds predicted
+  outcomes with R²≈0.99; betting when an offered price beat the bias-corrected
+  consensus (`odds > 1/(p_cons − α)`, α≈0.05) returned **+3.5%** on closing odds,
+  **+9.9%** on pre-kickoff odds, and **+6–8.5% with real money** — until the soft
+  books limited their accounts. ([code/data](https://github.com/Lisandro79/BeatTheBookie))
+- **A practitioner** running this on Betfair reports **~6% yield on £1M turnover
+  since 2023**: *weighted* average of sharp + soft odds → **Power Method** de-vig
+  → add own commission → **15–20% Kelly** → monitor Pinnacle to avoid getting
+  picked off → *"if you beat CLV consistently you will be profitable long term."*
+
+Every one of those levers is implemented here: weighted Power-Method consensus,
+commission-adjusted EV, 15–20% Kelly (`kelly_multiplier: 0.20`), near-kickoff
+timing, CLV tracking, and Pinnacle line-move protection (below). Both sources
+also confirm **why you bet on the exchange, not the soft books**: the books ban
+winners; Betfair doesn't.
+
+### Getting picked off: Pinnacle line-move protection
+A resting exchange bet can be "picked off" if the sharp line moves against it
+before it's matched. The bot mitigates this two ways:
+- **`watch` re-evaluates every cycle on fresh data**, so a bet that's no longer
+  +EV is simply not (re)placed; and it places **at the available price** near
+  kickoff (designed to match immediately, not rest).
+- For live resting orders, `BetfairClient.list_unmatched()` /
+  `cancel_orders()` let you pull bets when Pinnacle moves (POD-style). Weight
+  Pinnacle heavily in `book_weights` so the consensus tracks the sharp line.
 
 ## Continuous operation, timed to kickoff (`run.py watch`)
 
@@ -172,10 +212,11 @@ environment (`.env`). Key settings: `mode`, `pinnacle_source`, `venue_source`,
 python -m unittest discover -s tests -v
 ```
 
-42 tests: de-vig math (incl. power), Kelly/EV, commission-adjusted value, the
-edge haircut / liquidity / overround filters, liquidity stake cap, the Betfair
-price ladder, event matching, the continuous scheduler (window + dedup), store +
-settlement + CLV, the live-money safety gate, and full paper pipelines.
+52 tests: de-vig math (incl. power), Kelly/EV, commission-adjusted value, the
+weighted + Kaunitz consensus models and blend, book weighting, the edge haircut /
+liquidity / overround filters, liquidity stake cap, the Betfair price ladder,
+event matching, the continuous scheduler (window + dedup), store + settlement +
+CLV, the live-money safety gate, and full paper pipelines for every truth model.
 
 ## Modes
 
@@ -190,7 +231,8 @@ bot/
   models.py          dataclasses incl. FairLine, VenueQuote, ValueBet (+ exchange ids)
   devig.py           de-vig methods (multiplicative / additive / shin)
   pinnacle.py        Pinnacle truth source (direct API + via The Odds API)
-  betfair_client.py  shared Betfair session: prices + placement + price ladder
+  consensus.py       weighted Power-Method + Kaunitz consensus truth models
+  betfair_client.py  shared Betfair session: prices + placement + cancel + ladder
   matcher.py         pair Pinnacle <-> Betfair events, align runners -> boards
   value.py           ValueDetector + Kelly/EV (commission/haircut/liquidity-aware)
   bankroll.py        stake sizing & exposure caps (+ liquidity cap)

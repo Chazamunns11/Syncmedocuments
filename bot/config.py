@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass, field, fields
-from typing import List, Optional
+from typing import Dict, List, Optional
 
 
 @dataclass
@@ -25,6 +25,21 @@ class Config:
     markets: List[str] = field(default_factory=lambda: ["h2h"])
     provider: str = "sample"            # multi_book feed: "sample" | "the_odds_api"
     regions: str = "uk,eu"
+
+    # --- source of truth model ---
+    # How the fair probability is estimated:
+    #   "weighted"  - weighted Power-Method consensus across sharp + soft books
+    #                 (practitioner method; the most accurate default)
+    #   "pinnacle"  - single sharp book (Pinnacle), de-vigged
+    #   "consensus" - Kaunitz et al.: 1/mean(odds) - alpha (bias-corrected)
+    #   "blend"     - average of the pinnacle and weighted estimates
+    truth_model: str = "weighted"
+    # Per-bookmaker weights for the weighted consensus ("_default" applies to any
+    # book not listed). Sharp books should be weighted higher.
+    book_weights: Dict[str, float] = field(
+        default_factory=lambda: {"pinnacle": 3.0, "_default": 1.0})
+    consensus_min_books: int = 3        # min bookmakers required for a consensus
+    consensus_alpha: float = 0.05       # Kaunitz bias term (single-value form)
 
     # --- pinnacle (source of truth) ---
     pinnacle_source: str = "sample"     # "sample" | "the_odds_api" | "direct"
@@ -62,7 +77,7 @@ class Config:
 
     # --- staking / bankroll ---
     bankroll: float = 1000.0
-    kelly_multiplier: float = 0.25
+    kelly_multiplier: float = 0.20      # 15-20% Kelly is the practitioner range
     max_fraction_per_bet: float = 0.02
     min_stake: float = 1.0
     max_stake: float = 100.0

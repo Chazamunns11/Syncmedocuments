@@ -62,6 +62,12 @@ class MarketBoard:
     away_team: str
     market: str
     books: List[BookOdds] = field(default_factory=list)
+    # When set, these are FINAL fair probabilities (already de-vigged / bias
+    # corrected by the truth model) and the detector uses them directly instead
+    # of de-vigging a reference book.
+    fair_probs: Optional[Dict[str, float]] = None
+    fair_source: Optional[str] = None
+    overround: Optional[float] = None  # booksum of the underlying truth line
 
     def selections(self) -> List[str]:
         """Union of outcome names seen across all books (stable order)."""
@@ -146,6 +152,7 @@ class FairLine:
     probs: Dict[str, float] = field(default_factory=dict)
     source: str = "pinnacle"
     last_update: Optional[str] = None  # ISO timestamp of the underlying line
+    overround: Optional[float] = None  # booksum of the underlying odds (quality signal)
 
     def fair_price(self, selection: str) -> Optional[float]:
         p = self.probs.get(selection)
