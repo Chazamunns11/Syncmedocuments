@@ -45,11 +45,17 @@ class Config:
     consensus_recency_halflife_seconds: float = 0.0
 
     # --- pinnacle (source of truth) ---
-    pinnacle_source: str = "sample"     # "sample" | "the_odds_api" | "direct"
+    # "sample" | "rapidapi" (real-time Pinnacle reseller) | "the_odds_api" | "direct"
+    # NOTE: Pinnacle shut its own public API (Jul 2025) and The Odds API no longer
+    # carries Pinnacle, so "direct"/"the_odds_api"-for-pinnacle are effectively dead
+    # for new users — use "rapidapi" for a real Pinnacle line, or truth_model=weighted
+    # for a soft-book consensus via The Odds API. See SOURCES.md.
+    pinnacle_source: str = "sample"
     # Pinnacle's own sport key naming differs per source; for the_odds_api use
-    # the odds-api sport key (e.g. soccer_epl); for direct use a sport in
-    # pinnacle.PINNACLE_SPORT_IDS (e.g. "soccer").
+    # the odds-api sport key (e.g. soccer_epl); for rapidapi/direct use a sport in
+    # the relevant SPORT_IDS map (e.g. "soccer"), or set pinnacle_sport_id directly.
     pinnacle_sports: List[str] = field(default_factory=lambda: ["soccer_epl"])
+    pinnacle_sport_id: Optional[int] = None   # override reseller sport_id if needed
 
     # --- betfair (betting venue) ---
     venue_source: str = "sample"        # "sample" | "betfair"

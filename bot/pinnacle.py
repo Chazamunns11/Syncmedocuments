@@ -116,6 +116,73 @@ class PinnacleClient:
         return lines
 
 
+# --- RapidAPI "Pinnacle Odds" reseller (real-time) -----------------------
+# Pinnacle shut its own public API (July 2025) and The Odds API does not carry
+# Pinnacle, so the practical real-time Pinnacle feed for the public is a reseller
+# such as the RapidAPI "pinnacle-odds" service. money_line lives in periods.num_0.
+RAPIDAPI_PINNACLE_HOST = "pinnacle-odds.p.rapidapi.com"
+
+# sport_id used by the reseller's /kit/v1/markets endpoint (verify via /kit/v1/sports).
+RAPIDAPI_SPORT_IDS = {
+    "soccer": 1, "tennis": 2, "basketball": 3, "hockey": 4, "ice_hockey": 4,
+    "handball": 5, "volleyball": 6, "baseball": 9, "american_football": 7,
+    "mma": 8,
+}
+
+
+def pinnacle_lines_from_rapidapi_json(
+    data: dict, sport_key: str, devig_method: str = "multiplicative",
+) -> List[FairLine]:
+    """Parse the reseller's /kit/v1/markets payload into de-vigged FairLines.
+
+    Pure (no network) so it is unit-tested offline. Reads the full-match money
+    line from each event's ``periods.num_0.money_line`` (home/draw/away)."""
+    lines: List[FairLine] = []
+    for ev in (data or {}).get("events", []) or []:
+        ml = (((ev.get("periods") or {}).get("num_0") or {}).get("money_line")) or {}
+        home, away = ev.get("home"), ev.get("away")
+        if not (home and away and ml):
+            continue
+        names = [home, "Draw", away]
+        odds = [ml.get("home"), ml.get("draw"), ml.get("away")]
+        pairs = [(n, float(o)) for n, o in zip(names, odds) if o and float(o) > 1.0]
+        if len(pairs) < 2:
+            continue
+        try:
+            probs = devig([o for _, o in pairs], method=devig_method)
+        except ValueError:
+            continue
+        lines.append(FairLine(
+            event_key=str(ev.get("event_id")), sport_key=sport_key,
+            commence_time=str(ev.get("starts")), home_team=home, away_team=away,
+            market="h2h", probs={n: p for (n, _), p in zip(pairs, probs)},
+            source="pinnacle", last_update=str(ev.get("last_update") or ev.get("starts")),
+            overround=sum(1.0 / o for _, o in pairs),
+        ))
+    return lines
+
+
+def pinnacle_lines_via_rapidapi(
+    api_key: str, sport_key: str, sport_id: Optional[int] = None,
+    devig_method: str = "multiplicative", event_type: str = "prematch",
+    timeout: float = 15.0,
+) -> List[FairLine]:
+    """Fetch real-time Pinnacle money lines from the RapidAPI reseller."""
+    from .http import get_json
+    if not api_key:
+        raise ValueError("RapidAPI Pinnacle source needs ODDS_API_KEY (RapidAPI key)")
+    sid = sport_id if sport_id is not None else RAPIDAPI_SPORT_IDS.get(sport_key)
+    if sid is None:
+        raise ValueError(f"no RapidAPI sport_id for {sport_key!r}; set pinnacle_sport_id")
+    data, _ = get_json(
+        f"https://{RAPIDAPI_PINNACLE_HOST}/kit/v1/markets",
+        params={"sport_id": sid, "is_have_odds": "true", "event_type": event_type},
+        headers={"X-RapidAPI-Key": api_key, "X-RapidAPI-Host": RAPIDAPI_PINNACLE_HOST},
+        timeout=timeout,
+    )
+    return pinnacle_lines_from_rapidapi_json(data, sport_key, devig_method)
+
+
 def pinnacle_lines_via_odds_api(
     api_key: str, sport_key: str, regions: str = "uk,eu",
     devig_method: str = "multiplicative",

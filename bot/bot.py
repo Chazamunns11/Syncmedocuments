@@ -30,7 +30,8 @@ from .linemove import LineTracker
 from .matcher import EventMatcher
 from .models import FairLine, MarketBoard, PlacementResult, ValueBet, VenueQuote
 from .notify import Notifier
-from .pinnacle import PinnacleClient, pinnacle_lines_via_odds_api
+from .pinnacle import (PinnacleClient, pinnacle_lines_via_odds_api,
+                       pinnacle_lines_via_rapidapi)
 from .providers import SampleProvider, TheOddsAPIProvider
 from .risk import RiskLimits, RiskManager
 from .samples import (sample_betfair_quotes, sample_multibook_boards,
@@ -175,6 +176,12 @@ class ValueBettingBot:
                 return pinnacle_lines_via_odds_api(
                     api_key=self.cfg.odds_api_key or "", sport_key=sport,
                     regions=self.cfg.regions, devig_method=self.cfg.devig_method,
+                )
+            if src == "rapidapi":
+                return pinnacle_lines_via_rapidapi(
+                    api_key=self.cfg.odds_api_key or "", sport_key=sport,
+                    sport_id=self.cfg.pinnacle_sport_id,
+                    devig_method=self.cfg.devig_method,
                 )
             if src == "direct":
                 client = PinnacleClient(self.cfg.pinnacle_username or "",
