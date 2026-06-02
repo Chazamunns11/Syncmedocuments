@@ -128,11 +128,17 @@ class Config:
     min_bankroll_fraction: float = 0.50         # halt if bankroll below this fraction
 
     # --- execution ---
-    executor: str = "paper"            # "paper" | "betfair"
+    executor: str = "paper"            # "paper" | "betfair" | "smarkets"
     live: bool = False                 # MUST be True to place real bets
     paper_slippage: float = 0.0
     paper_fill_probability: float = 1.0
     betfair_dry_run: bool = True
+    # Smarkets venue (lowest commission, no premium charge). Live path is
+    # structurally complete but UNVALIDATED — keep smarkets_dry_run until verified.
+    smarkets_username: Optional[str] = None
+    smarkets_password: Optional[str] = None
+    smarkets_dry_run: bool = True
+    smarkets_commission: float = 0.01   # Pro/API tier ~1%, no Premium Charge
 
     # --- storage / logging ---
     db_path: str = "bets.db"
@@ -215,6 +221,8 @@ class Config:
         self.betfair_certs_path = os.getenv("BETFAIR_CERTS_PATH", self.betfair_certs_path)
         self.pinnacle_username = os.getenv("PINNACLE_USERNAME", self.pinnacle_username)
         self.pinnacle_password = os.getenv("PINNACLE_PASSWORD", self.pinnacle_password)
+        self.smarkets_username = os.getenv("SMARKETS_USERNAME", self.smarkets_username)
+        self.smarkets_password = os.getenv("SMARKETS_PASSWORD", self.smarkets_password)
         self.notify_webhook_url = os.getenv("NOTIFY_WEBHOOK_URL", self.notify_webhook_url)
         # Allow a hard env override for the live switch (belt-and-braces safety).
         if os.getenv("BETTING_LIVE", "").lower() in {"1", "true", "yes"}:

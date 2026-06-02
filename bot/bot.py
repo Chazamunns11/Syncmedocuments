@@ -97,8 +97,15 @@ def build_executor(cfg: Config, betfair_client: Optional[BetfairClient] = None) 
             ),
             dry_run=cfg.betfair_dry_run,
         )
-    if cfg.executor == "betfair" and not cfg.live:
-        log.warning("executor=betfair but live=False -> using PAPER executor")
+    if cfg.executor == "smarkets" and cfg.live:
+        from .execution.smarkets import SmarketsExecutor
+        log.warning("LIVE Smarkets executor selected (dry_run=%s)", cfg.smarkets_dry_run)
+        return SmarketsExecutor(
+            username=cfg.smarkets_username or "", password=cfg.smarkets_password or "",
+            dry_run=cfg.smarkets_dry_run,
+        )
+    if cfg.executor in ("betfair", "smarkets") and not cfg.live:
+        log.warning("executor=%s but live=False -> using PAPER executor", cfg.executor)
     return PaperExecutor(slippage=cfg.paper_slippage,
                          fill_probability=cfg.paper_fill_probability)
 

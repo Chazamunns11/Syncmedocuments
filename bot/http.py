@@ -63,6 +63,13 @@ def get_json(url: str, **kwargs):
     return resp.json(), resp.headers
 
 
+def post_json(url: str, **kwargs):
+    """POST and return parsed JSON, retrying as needed. Returns (json, headers)."""
+    resp = request("POST", url, **kwargs)
+    resp.raise_for_status()
+    return resp.json(), resp.headers
+
+
 def _retry_after(resp) -> Optional[float]:
     val = resp.headers.get("Retry-After")
     if not val:
