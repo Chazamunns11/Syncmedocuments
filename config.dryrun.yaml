@@ -1,0 +1,59 @@
+# Multi-sport DRY-RUN config — live prices, PAPER bets, no money at risk.
+#   python run.py --config config.dryrun.yaml doctor      # check wiring
+#   python run.py --config config.dryrun.yaml go --budget 1000 --stake 10
+#   python run.py --config config.dryrun.yaml validate     # is the edge real?
+# See DRYRUN.md for the full runbook.
+
+mode: pinnacle_betfair        # sharp consensus as truth + exchange prices
+pinnacle_source: the_odds_api # Pinnacle isn't UK-available directly
+venue_source: betfair         # read REAL Betfair prices
+executor: paper               # PAPER — never places real money
+live: false                   # hard safety gate stays closed
+
+# --- sports: more sports = more bets. Two aligned lists ---
+# pinnacle_sports = The Odds API sport keys (the "truth" feed).
+# betfair_event_types = Betfair event-type names (the venue feed).
+# The matcher reconciles the two by team/player names + kickoff time.
+# Start with clean 2-/3-way h2h sports; AVOID horse racing & golf (not h2h).
+pinnacle_sports:
+  - soccer_epl
+  - soccer_spain_la_liga
+  - soccer_germany_bundesliga
+  - soccer_italy_serie_a
+  - soccer_france_ligue_one
+  - soccer_uefa_champs_league
+  - basketball_nba          # high volume, clean 2-way
+  - tennis_atp_aus_open     # tennis = lots of daily 2-way matches (swap to the
+  - tennis_wta_aus_open     #   current tournament keys in season)
+  # - baseball_mlb          # add in season for more volume
+  # - icehockey_nhl
+
+betfair_event_types:
+  - soccer
+  - basketball
+  - tennis
+  # - baseball
+  # - ice_hockey
+
+markets: [h2h]                # match-odds only (cleanest signal)
+regions: [uk, eu]
+
+# --- the edge filters (keep these honest) ---
+block_adverse_sharp_move: true   # never catch a falling knife
+min_expected_clv: 0.0            # only +expected-CLV bets
+# require_sharp_move: true        # (optional) only bet the confirmed lag
+
+# --- staking: tiny + flat while validating ---
+flat_stake: 10
+max_stake: 25
+bankroll: 1000
+
+# --- polling cadence (MIND YOUR ODDS-API QUOTA — see note below) ---
+poll_interval_seconds: 90       # slow scan when nothing is near kickoff
+refresh_interval_seconds: 5     # fast only when an event is in-window
+place_window_minutes: 3         # paper-bet this long before kickoff
+
+# !! The Odds API bills ~1 credit per sport per poll (x regions x markets).
+# Many sports x frequent polling burns quota fast — the free 500/month tier is
+# nowhere near enough for this list. Start with a PAID tier, or trim the sport
+# list / raise poll_interval_seconds until your usage fits your plan.
