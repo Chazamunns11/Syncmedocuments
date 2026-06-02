@@ -279,6 +279,16 @@ class BetStore:
             "SELECT * FROM placements ORDER BY id DESC LIMIT ?", (limit,)
         ).fetchall()
 
+    def clv_samples(self, market: bool = True) -> List[float]:
+        """Per-bet CLV values for statistical validation. ``market`` selects CLV
+        vs the venue's own close (the real scoreboard); otherwise vs our model."""
+        col = "clv_market" if market else "clv"
+        rows = self._conn.execute(
+            f"SELECT {col} AS c FROM placements WHERE {col} IS NOT NULL "
+            "AND status IN ('PLACED','MATCHED','DRY_RUN')"
+        ).fetchall()
+        return [float(r["c"]) for r in rows]
+
     def summary(self) -> dict:
         row = self._conn.execute(
             """SELECT

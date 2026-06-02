@@ -10,9 +10,10 @@ their own numbers" + a practitioner running it on Betfair.
 ```bash
 python run.py go --budget 1000 --stake 50     # set budget/stake, start betting
 python run.py backtest --data "*.csv" --sweep  # validate + tune on real history
+python run.py validate      # is the edge real? go/no-go on captured CLV (see DRYRUN.md)
 python run.py doctor        # preflight checks before going live
 python run.py status        # bankroll / exposure / risk / CLV dashboard
-python -m unittest discover -s tests   # 139 tests, pure-stdlib, offline
+python -m unittest discover -s tests   # pure-stdlib, offline
 ```
 Runs fully offline in **sample + paper** mode with **no third-party deps**.
 Live needs `requests`, `PyYAML`, `betfairlightweight` (see requirements.txt) and

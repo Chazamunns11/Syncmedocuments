@@ -337,6 +337,28 @@ def cmd_report(cfg: Config) -> int:
         bot.close()
 
 
+def cmd_validate(cfg: Config, min_n: int) -> int:
+    """Is the edge real? Statistical go/no-go on the captured CLV."""
+    from bot.validate import assess_clv, format_verdict
+    bot = ValueBettingBot(cfg)
+    try:
+        s = bot.store.summary()
+        print("\n=== Dry-run validation: is the edge real? ===")
+        print(f"  placements: {s['n']}   settled: won {s['won']} lost {s['lost']} "
+              f"pending {s['pending']}")
+        mkt = assess_clv(bot.store.clv_samples(market=True), min_n=min_n)
+        mdl = assess_clv(bot.store.clv_samples(market=False), min_n=min_n)
+        print()
+        print(format_verdict("CLV vs MARKET close (the real scoreboard)", mkt))
+        print()
+        print(format_verdict("CLV vs our model", mdl))
+        print("\n  Decision rule: only stake real money once CLV-vs-market is ✅ GO.")
+        print("  Until then keep the dry-run running — it costs nothing.")
+        return 0 if mkt.verdict != "NO-GO" else 1
+    finally:
+        bot.close()
+
+
 def cmd_settle(cfg: Config, ref: str, result: str) -> int:
     bot = ValueBettingBot(cfg)
     try:
@@ -382,6 +404,10 @@ def main(argv=None) -> int:
     p_bt.add_argument("--validate", action="store_true",
                       help="walk-forward: tune on train, report honest out-of-sample edge")
     sub.add_parser("report", help="show logged placements and P&L")
+    p_val = sub.add_parser("validate",
+                           help="is the edge real? go/no-go on captured CLV")
+    p_val.add_argument("--min-bets", type=int, default=100,
+                       help="minimum bets before trusting CLV (default 100)")
     sub.add_parser("status", help="dashboard: bankroll, exposure, risk, CLV")
     sub.add_parser("doctor", help="preflight checks before going live")
     p_settle = sub.add_parser("settle", help="mark a placed bet WON/LOST/VOID")
@@ -420,6 +446,8 @@ def main(argv=None) -> int:
         return cmd_backtest(cfg, args)
     if args.command == "report":
         return cmd_report(cfg)
+    if args.command == "validate":
+        return cmd_validate(cfg, args.min_bets)
     if args.command == "status":
         return cmd_status(cfg)
     if args.command == "doctor":
