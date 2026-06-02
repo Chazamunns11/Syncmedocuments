@@ -143,6 +143,26 @@ class ContinuousRunner:
                              f"{market:.2f}" if market else "n/a")
         return recorded
 
+    def _maybe_daily_summary(self) -> None:
+        """Send a once-a-day digest of bankroll, P&L and CLV to the notifier."""
+        notifier = getattr(self.bot, "notifier", None)
+        if not (notifier and notifier.enabled):
+            return
+        today = _dt.datetime.fromtimestamp(
+            self.now_fn(), _dt.timezone.utc).date().isoformat()
+        if getattr(self, "_last_summary_day", None) == today:
+            return
+        self._last_summary_day = today
+        try:
+            s = self.bot.store.summary()
+            notifier.summary(
+                f"Daily: {s['n']} bets, P&L {s['profit']:+.2f}, "
+                f"ROI {s['roi']*100:+.2f}%, avg taken value "
+                f"{(s['avg_edge'] or 0)*100:+.2f}%, "
+                f"CLV-vs-market beat {s['clv_mkt_beat']}/{s['clv_mkt_n']}")
+        except Exception as exc:
+            log.warning("daily summary failed: %s", exc)
+
     def run(self) -> None:
         log.info("continuous runner started (place window %.0fs before start, "
                  "poll %.0fs / refresh %.0fs)",
@@ -164,6 +184,7 @@ class ContinuousRunner:
                 settled = self.bot.auto_settle()
                 if settled:
                     log.info("auto-settled %d bet(s) from Betfair", settled)
+            self._maybe_daily_summary()
             if self.max_cycles is not None and cycle >= self.max_cycles:
                 break
             self.sleep_fn(self._next_sleep(getattr(self, "_last_bets", [])))

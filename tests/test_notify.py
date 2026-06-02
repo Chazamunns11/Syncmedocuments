@@ -56,6 +56,26 @@ class TestNotifier(unittest.TestCase):
         self.assertEqual(sent, [])
 
 
+class TestDailySummary(unittest.TestCase):
+    def test_sends_once_per_day(self):
+        from bot.config import Config
+        from bot.bot import ValueBettingBot
+        from bot.scheduler import ContinuousRunner
+        with tempfile.TemporaryDirectory() as d:
+            cfg = Config(pinnacle_source="sample", venue_source="sample",
+                         notify_webhook_url="http://hook",
+                         db_path=os.path.join(d, "s.db"), csv_path=None)
+            bot = ValueBettingBot(cfg)
+            sent = []
+            bot.notifier._poster = lambda u, p: sent.append(p["text"])
+            # Fixed clock -> same UTC day across calls.
+            runner = ContinuousRunner(bot, now_fn=lambda: 1_000_000.0)
+            runner._maybe_daily_summary()
+            runner._maybe_daily_summary()  # same day -> no second send
+            self.assertEqual(len([m for m in sent if "Daily" in m]), 1)
+            bot.close()
+
+
 class TestBotIntegration(unittest.TestCase):
     def test_halt_notifies(self):
         from bot.config import Config

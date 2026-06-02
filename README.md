@@ -290,6 +290,24 @@ bot.store.record_closing(external_ref, closing_fair_price)  # clv = taken/closin
 Safety gates: a live executor is built only when `live: true`; anything else
 falls back to paper. `BETTING_LIVE=true` is an extra env switch.
 
+## Running it 24/7
+
+For an always-on bot, run it on a small VPS so it catches every kickoff:
+
+```bash
+# Docker (auto-restarts on crash/reboot):
+docker build -t valuebot .
+docker run -d --restart=always --name valuebot \
+  --env-file .env -v "$PWD/data:/data" valuebot \
+  go --budget 1000 --stake 10
+```
+
+Or with systemd / a process manager, just keep `python run.py go …` alive. Set
+`db_path`/`csv_path` to a persistent path (e.g. `/data/bets.db`) so the bankroll,
+CLV history and one-bet-per-event dedup survive restarts. Set
+`notify_webhook_url` to get a ping on every bet, every circuit-breaker halt, and
+a **daily summary** of P&L and CLV.
+
 ## Configuration
 
 All knobs live in `config.yaml` (documented inline); secrets come only from the
