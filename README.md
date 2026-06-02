@@ -43,6 +43,28 @@ The bot **cannot place a real bet** unless you explicitly set `live: true`,
 
 ---
 
+## Everything it does
+
+- **Truth models:** weighted Power-Method consensus (sharp-weighted, recency-aware),
+  single-book Pinnacle, Kaunitz α-corrected consensus, or a blend.
+- **De-vig:** multiplicative / additive / Shin / power / ensemble.
+- **Strict event matching:** alias map + accent/noise normalisation, both-team
+  orientation check, ambiguity rejection (won't bet the wrong game).
+- **Value engine:** commission-adjusted EV, edge haircut, liquidity & overround
+  filters, **expected-CLV gate (+CLV only)**, **one bet per event**.
+- **Staking:** fractional Kelly *or* flat stake, capped to bankroll, daily budget,
+  open exposure and **available liquidity**; compounding bankroll.
+- **Risk:** circuit breakers (drawdown stop-loss, bankroll floor, daily caps,
+  open-position cap) that halt betting automatically.
+- **Execution:** continuous near-kickoff scheduler, Betfair placement by runner
+  id, in-play cancel guard, **auto-settlement from Betfair cleared orders**.
+- **CLV:** taken value + expected CLV on every bet; **realised CLV vs the true
+  market close** captured automatically at kickoff.
+- **Validate before risking money:** backtest on football-data.co.uk history with
+  edge-bucket analysis and a **parameter sweep** to find the best settings.
+- **Ops:** `doctor` preflight, `status` dashboard, webhook/Slack alerts, retrying
+  HTTP, config validation, optional log file, multi-sport (soccer/tennis/…).
+
 ## Quick start
 
 ```bash
@@ -281,12 +303,13 @@ environment (`.env`). Key settings: `mode`, `pinnacle_source`, `venue_source`,
 python -m unittest discover -s tests -v
 ```
 
-60 tests: de-vig math (incl. power), Kelly/EV, commission-adjusted value, the
-weighted + Kaunitz consensus models and blend, book weighting, edge haircut /
-liquidity / overround filters, flat + Kelly staking with liquidity cap, expected
-CLV filtering, one-bet-per-event dedup, the Betfair price ladder, event matching,
-the continuous scheduler (window + dedup + automatic CLV capture), store +
-settlement + CLV, the `go` command, and full paper pipelines for every truth model.
+127 tests, pure-stdlib and offline, covering de-vig math (incl. power/ensemble),
+Kelly/EV, the consensus models + blend + recency weighting, alias matching &
+ambiguity rejection, every detector filter, flat/Kelly staking + caps, expected
+& realised CLV, one-bet-per-event, risk circuit breakers, the backtester +
+sweep, retrying HTTP, config validation, notifications, multi-sport, and the
+**Betfair live path** (placement/price parsing via mocked API objects), plus
+CLI smoke tests for every command.
 
 ## Modes
 
