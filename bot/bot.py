@@ -26,6 +26,7 @@ from .config import Config
 from .consensus import consensus_lines_from_boards, consensus_lines_via_odds_api
 from .execution import PaperExecutor
 from .execution.base import Executor
+from .freshness import assess_freshness
 from .linemove import LineTracker
 from .matcher import EventMatcher
 from .models import FairLine, MarketBoard, PlacementResult, ValueBet, VenueQuote
@@ -312,6 +313,10 @@ class ValueBettingBot:
             ).build_boards(fair, quotes)
             log.info("pinnacle lines=%d, betfair quotes=%d -> %d matched boards",
                      len(fair), len(quotes), len(boards))
+            # Surface how real-time the truth feed actually is (verify, don't trust).
+            fr = assess_freshness(fair, threshold_seconds=self.cfg.max_line_age_seconds)
+            if fr.n_timestamped:
+                log.info("truth-feed freshness: %s", fr.message)
             self._last_boards = boards
             self._track_lines(boards)
             return boards
