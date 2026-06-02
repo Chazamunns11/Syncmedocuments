@@ -19,7 +19,7 @@ def _load_dotenv(path: str = ".env") -> None:
     if not os.path.exists(path):
         return
     try:
-        with open(path, encoding="utf-8") as fh:
+        with open(path, encoding="utf-8-sig") as fh:  # utf-8-sig strips Windows BOM
             for line in fh:
                 line = line.strip()
                 if not line or line.startswith("#") or "=" not in line:
