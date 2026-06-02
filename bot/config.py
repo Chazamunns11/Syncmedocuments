@@ -119,6 +119,11 @@ class Config:
     csv_path: str = "bets.csv"
     log_file: Optional[str] = None      # also write logs here (for overnight runs)
 
+    # --- notifications (Slack/Discord/webhook) ---
+    notify_webhook_url: Optional[str] = None   # or NOTIFY_WEBHOOK_URL env var
+    notify_on_bets: bool = True
+    notify_on_halt: bool = True
+
     # --- secrets (env only) ---
     odds_api_key: Optional[str] = None
     betfair_username: Optional[str] = None
@@ -190,6 +195,7 @@ class Config:
         self.betfair_certs_path = os.getenv("BETFAIR_CERTS_PATH", self.betfair_certs_path)
         self.pinnacle_username = os.getenv("PINNACLE_USERNAME", self.pinnacle_username)
         self.pinnacle_password = os.getenv("PINNACLE_PASSWORD", self.pinnacle_password)
+        self.notify_webhook_url = os.getenv("NOTIFY_WEBHOOK_URL", self.notify_webhook_url)
         # Allow a hard env override for the live switch (belt-and-braces safety).
         if os.getenv("BETTING_LIVE", "").lower() in {"1", "true", "yes"}:
             self.live = True

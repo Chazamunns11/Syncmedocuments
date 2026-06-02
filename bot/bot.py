@@ -28,6 +28,7 @@ from .execution import PaperExecutor
 from .execution.base import Executor
 from .matcher import EventMatcher
 from .models import FairLine, MarketBoard, PlacementResult, ValueBet, VenueQuote
+from .notify import Notifier
 from .pinnacle import PinnacleClient, pinnacle_lines_via_odds_api
 from .providers import SampleProvider, TheOddsAPIProvider
 from .risk import RiskLimits, RiskManager
@@ -127,6 +128,9 @@ class ValueBettingBot:
             flat_stake=cfg.flat_stake,
         )
         self.store = BetStore(db_path=cfg.db_path, csv_path=cfg.csv_path)
+        self.notifier = Notifier(webhook_url=cfg.notify_webhook_url,
+                                 on_bets=cfg.notify_on_bets,
+                                 on_halt=cfg.notify_on_halt)
         self.risk = RiskManager(RiskLimits(
             starting_bankroll=cfg.bankroll,
             daily_stake_limit_fraction=cfg.daily_stake_limit_fraction,
@@ -339,6 +343,7 @@ class ValueBettingBot:
         ok, reason = self.risk.status(self.bankroll.bankroll)
         if not ok:
             log.warning("RISK HALT: %s — no bets placed", reason)
+            self.notifier.halt(reason)
             return results
         for bet in bets:
             if dedup and (bet.event_id in placed_events
@@ -356,6 +361,7 @@ class ValueBettingBot:
             results.append((bet, result))
             if result.ok:
                 placed_events.add(bet.event_id)
+                self.notifier.bet_placed(bet, result)
             log.info("%s %s @ %.2f stake %.2f value %+.2f%% exp-CLV %+.2f%% -> %s (%s)",
                      bet.bookmaker, bet.selection, bet.price, bet.stake,
                      bet.edge * 100, bet.exp_clv * 100, result.status, result.message)
