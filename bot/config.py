@@ -54,6 +54,9 @@ class Config:
     # --- betfair (betting venue) ---
     venue_source: str = "sample"        # "sample" | "betfair"
     betfair_event_type: str = "soccer"  # key in betfair_client.EVENT_TYPE_IDS
+    # Multiple event types for multi-sport running (e.g. ["soccer","tennis"]);
+    # empty -> just [betfair_event_type].
+    betfair_event_types: List[str] = field(default_factory=list)
     betfair_competition_ids: List[str] = field(default_factory=list)
     betfair_commission: float = 0.05    # commission on net winnings (UK base 5%)
     betfair_market_start_within_hours: int = 72

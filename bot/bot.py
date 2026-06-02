@@ -257,20 +257,25 @@ class ValueBettingBot:
     def _venue_quotes(self) -> List[VenueQuote]:
         if self.cfg.venue_source == "sample":
             return sample_betfair_quotes()
-        if self.cfg.venue_source == "betfair":
-            event_type = EVENT_TYPE_IDS.get(self.cfg.betfair_event_type)
+        if self.cfg.venue_source != "betfair":
+            raise ValueError(f"unknown venue_source {self.cfg.venue_source!r}")
+
+        types = self.cfg.betfair_event_types or [self.cfg.betfair_event_type]
+        quotes: List[VenueQuote] = []
+        for sport in types:
+            event_type = EVENT_TYPE_IDS.get(sport)
             if not event_type:
-                raise ValueError(f"unknown betfair_event_type {self.cfg.betfair_event_type!r}")
+                log.error("unknown betfair_event_type %r — skipping", sport)
+                continue
             try:
-                return self._betfair_client().list_match_odds(
+                quotes.extend(self._betfair_client().list_match_odds(
                     event_type_id=event_type,
                     competition_ids=self.cfg.betfair_competition_ids or None,
                     market_start_within_hours=self.cfg.betfair_market_start_within_hours,
-                )
+                ))
             except Exception as exc:
-                log.error("betfair price fetch failed: %s", exc)
-                return []
-        raise ValueError(f"unknown venue_source {self.cfg.venue_source!r}")
+                log.error("betfair price fetch failed for %s: %s", sport, exc)
+        return quotes
 
     # -- board construction ------------------------------------------------
     def _boards(self) -> List[MarketBoard]:
