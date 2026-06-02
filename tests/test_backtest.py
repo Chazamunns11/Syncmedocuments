@@ -5,7 +5,8 @@ import unittest
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from bot.backtest import (_discover_books, run_backtest, synthetic_rows,
-                          format_result, sweep, format_sweep)
+                          format_result, sweep, format_sweep,
+                          walk_forward, format_walk_forward)
 
 
 class TestDiscoverBooks(unittest.TestCase):
@@ -73,6 +74,24 @@ class TestSweep(unittest.TestCase):
         clvs = [r.avg_clv for _, r in ranked if r.avg_clv is not None]
         self.assertEqual(clvs, sorted(clvs, reverse=True))  # best-first
         self.assertIn("sweep", format_sweep(ranked).lower())
+
+
+class TestWalkForward(unittest.TestCase):
+    def test_train_test_split_and_report(self):
+        rows = synthetic_rows(n=2000, edge=0.04, seed=21)
+        params, train, test = walk_forward(rows, grid={
+            "method": ["weighted"], "min_edge": [0.02, 0.04],
+            "devig_method": ["power"], "consensus_alpha": [0.05]})
+        self.assertIsNotNone(params)
+        self.assertGreater(train.bets, 0)
+        self.assertGreater(test.bets, 0)
+        # The synthetic closing line is fair, so out-of-sample CLV stays positive.
+        self.assertGreater(test.avg_clv, 0)
+        self.assertIn("out-of-sample", format_walk_forward(params, train, test))
+
+    def test_too_few_rows_raises(self):
+        with self.assertRaises(ValueError):
+            walk_forward(synthetic_rows(10))
 
 
 if __name__ == "__main__":

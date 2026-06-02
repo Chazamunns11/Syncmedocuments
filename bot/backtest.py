@@ -324,6 +324,53 @@ def format_sweep(ranked: List) -> str:
     return "\n".join(lines)
 
 
+def walk_forward(rows: List[dict], grid: Optional[dict] = None,
+                 train_frac: float = 0.5):
+    """Out-of-sample validation. Optimise parameters on the first ``train_frac``
+    of matches (chronological), then evaluate the chosen configuration on the
+    held-out remainder. The TEST result is the honest estimate of forward edge —
+    a sweep judged in-sample always overstates it. Returns (params, train, test)."""
+    if len(rows) < 40:
+        raise ValueError("need more matches for a meaningful walk-forward split")
+    cut = int(len(rows) * train_frac)
+    train_rows, test_rows = rows[:cut], rows[cut:]
+    ranked = sweep(train_rows, grid=grid, top=1)
+    if not ranked:
+        return None, None, None
+    params, train_res = ranked[0]
+    test_res = run_backtest(test_rows, flat_stake=1.0, **params)
+    return params, train_res, test_res
+
+
+def format_walk_forward(params, train, test) -> str:
+    if params is None:
+        return "Walk-forward: no configuration produced enough bets."
+    p = " ".join(f"{k}={v}" for k, v in params.items())
+
+    def line(tag, r):
+        clv = f"{r.avg_clv*100:+.2f}%" if r.avg_clv is not None else "n/a"
+        return (f"  {tag:5s}: {r.bets:5d} bets  yield {r.yield_pct:+6.2f}%  "
+                f"CLV {clv}")
+    test_clv = test.avg_clv if test.avg_clv is not None else None
+    if test_clv is None:
+        verdict = "no closing odds in test set — can't judge CLV"
+    elif test_clv > 0.005:
+        verdict = (f"CLV edge HELD out-of-sample ({test_clv*100:+.2f}%) — the "
+                   f"durable signal; yield is noisier over this sample")
+    elif test_clv > 0:
+        verdict = "marginal out-of-sample CLV — needs more data to trust"
+    else:
+        verdict = "NO out-of-sample CLV edge — be sceptical, likely overfit/efficient"
+    return "\n".join([
+        "=== Walk-forward validation ===",
+        f"  best config (on train): {p}",
+        line("train", train),
+        line("TEST", test),
+        "  (CLV is the durable edge signal; yield is high-variance noise.)",
+        f"  verdict: {verdict}",
+    ])
+
+
 def synthetic_rows(n: int = 400, edge: float = 0.03, seed: int = 7) -> List[dict]:
     """Generate synthetic football-data-style rows with a known exploitable edge,
     for offline testing/demo. Many books price near fair; ONE soft book (VC)

@@ -147,7 +147,8 @@ def cmd_go(cfg: Config, args) -> int:
 def cmd_backtest(cfg: Config, args) -> int:
     """Validate the strategy on historical data before risking money."""
     from bot.backtest import (load_football_data, run_backtest, format_result,
-                              synthetic_rows, sweep, format_sweep)
+                              synthetic_rows, sweep, format_sweep,
+                              walk_forward, format_walk_forward)
     if args.data:
         rows = load_football_data(args.data)
         print(f"Loaded {len(rows)} historical matches from {len(args.data)} path(s).")
@@ -158,6 +159,10 @@ def cmd_backtest(cfg: Config, args) -> int:
     if not rows:
         print("No usable rows found.")
         return 1
+    if args.validate:
+        print("Walk-forward: optimising on train, validating out-of-sample...")
+        print(format_walk_forward(*walk_forward(rows)))
+        return 0
     if args.sweep:
         print("Sweeping parameters to find the most profitable configuration...")
         print(format_sweep(sweep(rows)))
@@ -370,6 +375,8 @@ def main(argv=None) -> int:
                       help="number of synthetic matches if no --data")
     p_bt.add_argument("--sweep", action="store_true",
                       help="grid-search parameters and rank by CLV/yield")
+    p_bt.add_argument("--validate", action="store_true",
+                      help="walk-forward: tune on train, report honest out-of-sample edge")
     sub.add_parser("report", help="show logged placements and P&L")
     sub.add_parser("status", help="dashboard: bankroll, exposure, risk, CLV")
     sub.add_parser("doctor", help="preflight checks before going live")
