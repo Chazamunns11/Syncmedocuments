@@ -11,6 +11,27 @@ from dataclasses import dataclass, field, fields
 from typing import Dict, List, Optional
 
 
+def _load_dotenv(path: str = ".env") -> None:
+    """Load KEY=VALUE lines from a .env file into os.environ (without overriding
+    vars already set). Pure stdlib so it works the same on Windows/macOS/Linux —
+    no `set -a`/`source` or PowerShell juggling needed. Silently does nothing if
+    the file is absent."""
+    if not os.path.exists(path):
+        return
+    try:
+        with open(path, encoding="utf-8") as fh:
+            for line in fh:
+                line = line.strip()
+                if not line or line.startswith("#") or "=" not in line:
+                    continue
+                key, _, val = line.partition("=")
+                key, val = key.strip(), val.strip().strip('"').strip("'")
+                if key and key not in os.environ:
+                    os.environ[key] = val
+    except OSError:
+        pass
+
+
 @dataclass
 class Config:
     # --- pipeline mode ---
@@ -161,6 +182,7 @@ class Config:
 
     @classmethod
     def load(cls, path: Optional[str] = "config.yaml") -> "Config":
+        _load_dotenv()   # make .env work everywhere (no bash/PowerShell juggling)
         data = {}
         if path and os.path.exists(path):
             try:
