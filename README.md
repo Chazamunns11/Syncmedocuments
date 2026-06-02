@@ -300,18 +300,23 @@ bot/
   config.py          layered config (defaults < yaml < env)
   models.py          dataclasses incl. FairLine, VenueQuote, ValueBet (+ exchange ids)
   devig.py           de-vig methods (multiplicative / additive / shin)
+  devig.py           de-vig: multiplicative/additive/shin/power/ensemble
   pinnacle.py        Pinnacle truth source (direct API + via The Odds API)
-  consensus.py       weighted Power-Method + Kaunitz consensus truth models
-  betfair_client.py  shared Betfair session: prices + placement + cancel + ladder
-  matcher.py         pair Pinnacle <-> Betfair events, align runners -> boards
-  value.py           ValueDetector + Kelly/EV (commission/haircut/liquidity-aware)
-  bankroll.py        stake sizing & exposure caps (+ liquidity cap)
-  scheduler.py       continuous near-kickoff runner (adaptive polling + dedup)
-  samples.py         offline sample Pinnacle lines + Betfair quotes
+  consensus.py       weighted (Power-Method, recency-weighted) + Kaunitz consensus
+  aliases.py         team-name normalisation + alias map + similarity
+  matcher.py         strict, alias-aware, ambiguity-rejecting event matching
+  value.py           ValueDetector + Kelly/EV (commission/haircut/liquidity/+CLV)
+  bankroll.py        Kelly or flat staking + caps (incl. liquidity cap)
+  risk.py            circuit breakers + daily/exposure stake caps
+  betfair_client.py  one Betfair session: prices + placement + cancel + cleared + ladder
+  scheduler.py       continuous near-kickoff runner (adaptive poll, dedup, CLV, auto-settle)
+  samples.py         offline sample Pinnacle lines + Betfair quotes + multi-book
+  backtest.py        football-data.co.uk loader, run_backtest, edge buckets, sweep
+  http.py            retrying HTTP with exponential backoff
   providers/         multi_book feeds: sample + the_odds_api
   execution/         paper (default) + betfair (real exchange)
-  store.py           SQLite + CSV logging, settlement, P&L + CLV
-  bot.py             orchestration (concurrent fetch) + live-money safety gate
-run.py               CLI: go | scan | run | watch | report | settle
+  store.py           SQLite + CSV: logging, settlement (+ from Betfair), CLV, P&L, meta
+  bot.py             orchestration (concurrent fetch) + risk + live-money safety gate
+run.py               CLI: go | scan | run | watch | backtest | doctor | status | report | settle
 tests/               unit + end-to-end tests
 ```
