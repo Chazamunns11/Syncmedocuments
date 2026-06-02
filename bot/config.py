@@ -86,6 +86,17 @@ class Config:
     min_expected_clv: float = 0.0      # only bet when expected CLV exceeds this (>0)
     one_bet_per_event: bool = True     # never place more than one bet on an event
 
+    # --- sharp line-movement (Betfair is itself sharp; exploit the LAG) ---
+    # Never bet when the sharp consensus is moving AWAY from your selection by
+    # this much over the window (a falling-knife trap -> -CLV). Default ON.
+    block_adverse_sharp_move: bool = True
+    adverse_move_threshold: float = 0.02      # fair-prob drop that blocks a bet
+    # Opt-in: ONLY bet when the sharp has moved TOWARD your selection (Betfair
+    # lagging) by at least min_sharp_move over the window. Off by default.
+    require_sharp_move: bool = False
+    min_sharp_move: float = 0.01
+    sharp_move_window_seconds: float = 900.0  # lookback for "recent" movement
+
     # --- continuous / near-kickoff scheduling ---
     poll_interval_seconds: float = 60.0     # cadence when nothing is near kickoff
     refresh_interval_seconds: float = 5.0   # cadence when an event is in-window

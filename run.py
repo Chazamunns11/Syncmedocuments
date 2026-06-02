@@ -55,9 +55,13 @@ def cmd_scan(cfg: Config) -> int:
             if b.commission and b.eff_price:
                 comm = f" net {b.eff_price:.2f} after {b.commission*100:.0f}% comm"
             print(f"      fair {b.fair_price:.2f} (p={b.fair_prob:.3f}){comm}")
+            move = ""
+            if b.sharp_move is not None:
+                arrow = "→toward" if b.sharp_move > 0 else ("→away" if b.sharp_move < 0 else "flat")
+                move = f"   sharp {arrow} {b.sharp_move*100:+.1f}pp"
             print(f"      taken value {b.edge*100:+.2f}%   "
                   f"expected CLV {b.exp_clv*100:+.2f}%   "
-                  f"EV/unit {b.ev:+.3f}   stake {_fmt_money(b.stake)}")
+                  f"EV/unit {b.ev:+.3f}   stake {_fmt_money(b.stake)}{move}")
         return 0
     finally:
         bot.close()

@@ -210,6 +210,20 @@ timing, CLV tracking, and Pinnacle line-move protection (below). Both sources
 also confirm **why you bet on the exchange, not the soft books**: the books ban
 winners; Betfair doesn't.
 
+### Betfair is sharp too — exploit the LAG, not a static gap
+Betfair Exchange is itself one of the sharpest prices in the market, so a static
+"Betfair beats fair" gap is thin and often a trap. The real edge is **timing**:
+the sharp consensus (Pinnacle/weighted books) has just *moved* but Betfair hasn't
+caught up yet. The bot tracks how the sharp line moves per selection and:
+- **blocks** any bet where the sharp is moving *away* from your pick
+  (`block_adverse_sharp_move`, default on) — a falling-knife trap where Betfair's
+  price will drop and you'd get −CLV;
+- optionally **only fires** when the sharp has moved *toward* your pick and
+  Betfair is lagging (`require_sharp_move`) — the actual exploitable moment.
+
+This reframes the strategy honestly: you're betting that **Betfair is temporarily
+lagging the sharp market**, and CLV measures whether you won that race.
+
 ### Getting picked off: Pinnacle line-move protection
 A resting exchange bet can be "picked off" if the sharp line moves against it
 before it's matched. The bot mitigates this two ways:

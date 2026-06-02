@@ -104,6 +104,7 @@ class ValueBet:
     venue_market_id: Optional[str] = None
     venue_selection_id: Optional[str] = None
     available_size: Optional[float] = None  # liquidity available at the venue price
+    sharp_move: Optional[float] = None      # recent sharp fair-prob move toward this pick
     identified_at: str = field(default_factory=utcnow_iso)
 
     @property

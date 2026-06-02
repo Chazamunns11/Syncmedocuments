@@ -57,6 +57,17 @@ max_overround: 1.15            # skip Pinnacle markets wider than this booksum
 min_expected_clv: 0.0          # only bet when expected CLV exceeds this (>0 = +CLV)
 one_bet_per_event: true        # never place more than one bet on a single event
 
+# === sharp line-movement (Betfair is itself sharp — exploit the LAG) ===
+# Never bet when the sharp consensus is moving AWAY from your pick (a falling-
+# knife trap: Betfair's price will drop and you'd be picked off / -CLV).
+block_adverse_sharp_move: true
+adverse_move_threshold: 0.02   # fair-prob drop (2pp) over the window that blocks
+# Opt-in: ONLY bet when the sharp has moved TOWARD your pick and Betfair is
+# lagging (the actual exploitable moment). Stricter, fewer, higher-conviction.
+require_sharp_move: false
+min_sharp_move: 0.01
+sharp_move_window_seconds: 900 # lookback window for "recent" movement
+
 # === continuous / near-kickoff scheduling (used by `run.py watch`) ===
 poll_interval_seconds: 60      # cadence when nothing is near kickoff
 refresh_interval_seconds: 5    # cadence when an event is inside its place window

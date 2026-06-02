@@ -26,6 +26,7 @@ from .config import Config
 from .consensus import consensus_lines_from_boards, consensus_lines_via_odds_api
 from .execution import PaperExecutor
 from .execution.base import Executor
+from .linemove import LineTracker
 from .matcher import EventMatcher
 from .models import FairLine, MarketBoard, PlacementResult, ValueBet, VenueQuote
 from .notify import Notifier
@@ -145,6 +146,9 @@ class ValueBettingBot:
             self.refresh_bankroll()
         # Latest matched boards, kept so CLV can be captured at kickoff.
         self._last_boards: List[MarketBoard] = []
+        # Tracks how the sharp line moves vs Betfair, to exploit the lag.
+        self._tracker = LineTracker(
+            max_age_seconds=max(3600.0, cfg.sharp_move_window_seconds * 2))
         # A single Betfair session shared between the price source and executor.
         self._betfair: Optional[BetfairClient] = None
         # Persistent executor reused across a continuous loop.
@@ -295,6 +299,7 @@ class ValueBettingBot:
             log.info("pinnacle lines=%d, betfair quotes=%d -> %d matched boards",
                      len(fair), len(quotes), len(boards))
             self._last_boards = boards
+            self._track_lines(boards)
             return boards
         if self.cfg.mode == "multi_book":
             provider = (TheOddsAPIProvider(api_key=self.cfg.odds_api_key or "",
@@ -322,12 +327,50 @@ class ValueBettingBot:
             self._executor = self._build_executor()
         return self._executor
 
+    # -- sharp line-movement -----------------------------------------------
+    def _track_lines(self, boards: List[MarketBoard]) -> None:
+        """Record the current sharp fair prob and Betfair price for every
+        selection, so we can later judge how the sharp line is moving."""
+        for board in boards:
+            if not board.fair_probs:
+                continue
+            bf = next((bk for bk in board.books if bk.bookmaker == "betfair"), None)
+            for sel, prob in board.fair_probs.items():
+                price = bf.price_for(sel) if bf else None
+                self._tracker.update(LineTracker.key(board.event_id, sel),
+                                     prob, price)
+
+    def _movement_filter(self, bets: List[ValueBet]) -> List[ValueBet]:
+        """Drop bets the sharp line is moving against (trap), and — if
+        require_sharp_move — keep only those the sharp is moving toward (lag).
+        Annotates each surviving bet with the detected sharp move."""
+        if not (self.cfg.block_adverse_sharp_move or self.cfg.require_sharp_move):
+            return bets
+        window = self.cfg.sharp_move_window_seconds
+        kept: List[ValueBet] = []
+        for bet in bets:
+            mv = self._tracker.move(LineTracker.key(bet.event_id, bet.selection),
+                                    window)
+            d_prob = mv[0] if mv else None
+            bet.sharp_move = d_prob
+            if d_prob is not None and self.cfg.block_adverse_sharp_move \
+                    and d_prob <= -self.cfg.adverse_move_threshold:
+                log.info("skip %s: sharp moving AWAY (%.3f) — falling-knife trap",
+                         bet.selection, d_prob)
+                continue
+            if self.cfg.require_sharp_move:
+                if d_prob is None or d_prob < self.cfg.min_sharp_move:
+                    continue  # no confirmed favourable lag yet
+            kept.append(bet)
+        return kept
+
     # -- identification only ----------------------------------------------
     def evaluate(self) -> List[ValueBet]:
         """Fetch fresh data, detect value and assign stakes. No placement."""
         from .value import ValueDetector
         boards = self._boards()
         bets = ValueDetector(**self.detector_kwargs).detect(boards)
+        bets = self._movement_filter(bets)
         staked = self.bankroll.assign(bets)
         log.info("%d boards -> %d value bets, %d stakeable",
                  len(boards), len(bets), len(staked))
