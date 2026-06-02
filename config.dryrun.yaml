@@ -4,11 +4,21 @@
 #   python run.py --config config.dryrun.yaml validate     # is the edge real?
 # See DRYRUN.md for the full runbook.
 
-mode: pinnacle_betfair        # sharp consensus as truth + exchange prices
-pinnacle_source: the_odds_api # Pinnacle isn't UK-available directly
+mode: pinnacle_betfair        # sharp truth + exchange prices
 venue_source: betfair         # read REAL Betfair prices
 executor: paper               # PAPER — never places real money
 live: false                   # hard safety gate stays closed
+
+# --- TRUTH source (see SOURCES.md) ---
+# Default: soft-book WEIGHTED CONSENSUS via The Odds API. Works with just an
+# ODDS_API_KEY — no Pinnacle subscription. (The Odds API no longer carries
+# Pinnacle, and Pinnacle's own API shut in Jul 2025.)
+truth_model: weighted
+pinnacle_source: the_odds_api   # only used if truth_model: pinnacle
+# For a SHARPER, real Pinnacle signal, get a RapidAPI "Pinnacle Odds" key and use:
+#   truth_model: pinnacle
+#   pinnacle_source: rapidapi
+#   (set ODDS_API_KEY to your RapidAPI key; pinnacle_sports become "soccer"/"tennis"…)
 
 # --- sports: more sports = more bets. Two aligned lists ---
 # pinnacle_sports = The Odds API sport keys (the "truth" feed).
