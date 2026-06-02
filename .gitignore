@@ -17,3 +17,6 @@ __pycache__/
 venv/
 .pytest_cache/
 *.egg-info/
+
+# Downloaded backtest data (re-fetch with scripts/fetch_sample_data.sh)
+data/

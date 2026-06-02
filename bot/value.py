@@ -17,7 +17,7 @@ import statistics
 from typing import List, Optional
 
 from .devig import devig
-from .models import MarketBoard, ValueBet
+from .models import MarketBoard, ValueBet, clv_priority_key
 
 
 def kelly_fraction(prob: float, price: float) -> float:
@@ -43,12 +43,14 @@ def _fair_probs(
     board: MarketBoard,
     reference_books: List[str],
     method: str,
-) -> Optional[dict]:
-    """Return {selection: fair_prob} from the first available reference book,
-    else from the de-vigged consensus across all books. None if unusable."""
+):
+    """Return ``(probs, overround)`` where ``probs`` is {selection: fair_prob}
+    from the first available reference book (else the de-vigged consensus) and
+    ``overround`` is the booksum of the source used (a market-quality signal).
+    Returns None if unusable."""
     selections = board.selections()
 
-    def from_book(book) -> Optional[dict]:
+    def from_book(book):
         odds = [book.price_for(s) for s in selections]
         if any(o is None for o in odds):
             return None
@@ -56,7 +58,7 @@ def _fair_probs(
             fair = devig(odds, method=method)
         except ValueError:
             return None
-        return dict(zip(selections, fair))
+        return dict(zip(selections, fair)), sum(1.0 / o for o in odds)
 
     by_name = {b.bookmaker.lower(): b for b in board.books}
     for ref in reference_books:
@@ -69,20 +71,21 @@ def _fair_probs(
     # Consensus fallback: average de-vigged probability across every book that
     # quotes the full set of selections.
     per_selection: dict = {s: [] for s in selections}
-    used = 0
+    overrounds: list = []
     for book in board.books:
         res = from_book(book)
         if res:
-            used += 1
-            for s, p in res.items():
+            probs, over = res
+            overrounds.append(over)
+            for s, p in probs.items():
                 per_selection[s].append(p)
-    if used == 0:
+    if not overrounds:
         return None
     consensus = {s: statistics.mean(v) for s, v in per_selection.items() if v}
     total = sum(consensus.values())
     if total <= 0:
         return None
-    return {s: p / total for s, p in consensus.items()}
+    return {s: p / total for s, p in consensus.items()}, statistics.mean(overrounds)
 
 
 class ValueDetector:
@@ -96,25 +99,71 @@ class ValueDetector:
         min_price: float = 1.30,
         max_price: float = 15.0,
         exclude_books: Optional[List[str]] = None,
+        commission: float = 0.0,
+        edge_haircut: float = 0.0,
+        min_liquidity: float = 0.0,
+        max_overround: float = 1.20,
+        min_expected_clv: float = 0.0,
+        one_per_event: bool = True,
     ):
         # Reference (sharp) books in priority order.
         self.reference_books = reference_books or ["pinnacle"]
         self.devig_method = devig_method
         self.min_edge = min_edge          # require price/fair_price - 1 >= this
+        # Require the taken price to beat the fair (closing-proxy) price by at
+        # least this much GROSS of commission -> positive expected Closing Line
+        # Value. Beating the closing line is the strongest predictor of a real
+        # edge, so this is the core "only bet +CLV" guard.
+        self.min_expected_clv = min_expected_clv
+        # Place at most one bet per event (keep the best-edge selection).
+        self.one_per_event = one_per_event
         self.min_price = min_price        # ignore very short prices
         self.max_price = max_price        # ignore lottery longshots
+        # Commission charged on net winnings at the betting venue (e.g. Betfair
+        # ~2-5%). The edge/EV/Kelly are computed on the commission-adjusted
+        # ("effective") price so the bot only bets when value survives the rake.
+        self.commission = commission
+        # Conservative absolute haircut subtracted from the measured edge to
+        # account for fair-price estimation error and execution slippage. This
+        # raises accuracy by filtering thin, likely-spurious "value".
+        self.edge_haircut = edge_haircut
+        # Skip venue prices with less than this much money available to back.
+        self.min_liquidity = min_liquidity
+        # Skip reference markets whose booksum exceeds this (too wide a margin
+        # signals an early/illiquid line that is a poor truth estimate).
+        self.max_overround = max_overround
         # Never flag the reference book against itself.
         self.exclude_books = {b.lower() for b in (exclude_books or [])}
         self.exclude_books |= {b.lower() for b in self.reference_books}
 
+    def _effective_price(self, price: float) -> float:
+        """Decimal odds after commission on net winnings: a winning back bet at
+        ``price`` returns (price-1)*(1-commission) profit per unit staked."""
+        if self.commission <= 0:
+            return price
+        return 1.0 + (price - 1.0) * (1.0 - self.commission)
+
     def detect_board(self, board: MarketBoard) -> List[ValueBet]:
-        fair = _fair_probs(board, self.reference_books, self.devig_method)
-        if not fair:
+        # Prefer final fair probabilities supplied by the truth model (Pinnacle /
+        # weighted consensus / Kaunitz); otherwise de-vig a reference book.
+        if board.fair_probs:
+            fair = board.fair_probs
+            overround = board.overround
+        else:
+            result = _fair_probs(board, self.reference_books, self.devig_method)
+            if not result:
+                return []
+            fair, overround = result
+        # Reject markets whose underlying truth line is too wide to trust.
+        if overround is not None and overround > self.max_overround:
             return []
 
         found: List[ValueBet] = []
         for book in board.books:
             if book.bookmaker.lower() in self.exclude_books:
+                continue
+            # Never bet against the truth book itself (case-insensitive).
+            if board.fair_source and book.bookmaker.lower() == board.fair_source.lower():
                 continue
             for outcome in book.outcomes:
                 p = fair.get(outcome.name)
@@ -123,11 +172,26 @@ class ValueDetector:
                 price = outcome.price
                 if price < self.min_price or price > self.max_price:
                     continue
-                fair_price = 1.0 / p
-                edge = price / fair_price - 1.0
-                if edge < self.min_edge:
+                # Liquidity filter: only bet where there's enough money to back.
+                # Fail closed — if liquidity is required but unknown, skip.
+                if self.min_liquidity > 0 and (outcome.size is None
+                                               or outcome.size < self.min_liquidity):
                     continue
-                ev = expected_value(p, price)
+                eff_price = self._effective_price(price)
+                fair_price = 1.0 / p
+                # Expected Closing Line Value: how much the taken price beats the
+                # fair (closing-proxy) price, GROSS of commission. Must be > the
+                # configured minimum so we only ever take +CLV bets.
+                exp_clv = price / fair_price - 1.0
+                if exp_clv < self.min_expected_clv:
+                    continue
+                # Edge and EV are measured on the commission-adjusted price, then
+                # cut by a conservative haircut before the threshold test.
+                edge = eff_price / fair_price - 1.0
+                net_edge = edge - self.edge_haircut
+                if net_edge < self.min_edge:
+                    continue
+                ev = expected_value(p, eff_price)
                 if ev <= 0:
                     continue
                 found.append(
@@ -142,9 +206,18 @@ class ValueDetector:
                         price=price,
                         fair_prob=p,
                         fair_price=fair_price,
-                        edge=edge,
+                        edge=net_edge,
                         ev=ev,
-                        kelly_fraction=kelly_fraction(p, price),
+                        exp_clv=exp_clv,
+                        # Size Kelly on the haircut-adjusted probability so stakes
+                        # stay conservative relative to estimation uncertainty.
+                        kelly_fraction=kelly_fraction(p / (1.0 + self.edge_haircut),
+                                                      eff_price),
+                        commission=self.commission,
+                        eff_price=eff_price,
+                        venue_market_id=book.market_id,
+                        venue_selection_id=outcome.selection_id,
+                        available_size=outcome.size,
                     )
                 )
         return found
@@ -153,6 +226,17 @@ class ValueDetector:
         bets: List[ValueBet] = []
         for board in boards:
             bets.extend(self.detect_board(board))
-        # Best edge first.
-        bets.sort(key=lambda b: b.edge, reverse=True)
+        # Prioritise the highest expected CLV first (edge breaks ties). CLV — how
+        # much we beat the close — is the metric that actually predicts profit.
+        bets.sort(key=clv_priority_key, reverse=True)
+        if self.one_per_event:
+            # Keep only the single highest-CLV bet per event.
+            seen = set()
+            unique = []
+            for b in bets:
+                if b.event_id in seen:
+                    continue
+                seen.add(b.event_id)
+                unique.append(b)
+            bets = unique
         return bets

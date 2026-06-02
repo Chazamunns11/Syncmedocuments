@@ -23,6 +23,10 @@ class Outcome:
     name: str
     price: float  # decimal odds, e.g. 2.50
     point: Optional[float] = None  # handicap / total line, if applicable
+    # Exchange identifiers, populated when this outcome is a venue (Betfair)
+    # runner, so it can be placed without any fuzzy name matching.
+    selection_id: Optional[str] = None
+    size: Optional[float] = None  # amount available to back at this price
 
 
 @dataclass
@@ -33,6 +37,7 @@ class BookOdds:
     market: str  # e.g. "h2h", "spreads", "totals"
     outcomes: List[Outcome]
     last_update: Optional[str] = None
+    market_id: Optional[str] = None  # exchange market id, for placement
 
     def price_for(self, selection: str) -> Optional[float]:
         for o in self.outcomes:
@@ -57,6 +62,12 @@ class MarketBoard:
     away_team: str
     market: str
     books: List[BookOdds] = field(default_factory=list)
+    # When set, these are FINAL fair probabilities (already de-vigged / bias
+    # corrected by the truth model) and the detector uses them directly instead
+    # of de-vigging a reference book.
+    fair_probs: Optional[Dict[str, float]] = None
+    fair_source: Optional[str] = None
+    overround: Optional[float] = None  # booksum of the underlying truth line
 
     def selections(self) -> List[str]:
         """Union of outcome names seen across all books (stable order)."""
@@ -82,10 +93,18 @@ class ValueBet:
     price: float             # decimal odds we intend to take
     fair_prob: float         # de-vigged probability of winning
     fair_price: float        # 1 / fair_prob
-    edge: float              # price / fair_price - 1  (relative overlay)
-    ev: float                # expected profit per 1 unit staked
+    edge: float              # taken value: net overlay vs fair price (after commission/haircut)
+    ev: float                # expected profit per 1 unit staked (net of commission)
     kelly_fraction: float    # fraction of bankroll suggested (pre-cap)
+    exp_clv: float = 0.0     # expected Closing Line Value: gross price/fair_price - 1
     stake: float = 0.0       # actual stake assigned by bankroll manager
+    # Exchange / commission detail (populated for venue bets such as Betfair).
+    commission: float = 0.0          # commission rate applied to net winnings
+    eff_price: Optional[float] = None  # commission-adjusted decimal odds used for EV
+    venue_market_id: Optional[str] = None
+    venue_selection_id: Optional[str] = None
+    available_size: Optional[float] = None  # liquidity available at the venue price
+    sharp_move: Optional[float] = None      # recent sharp fair-prob move toward this pick
     identified_at: str = field(default_factory=utcnow_iso)
 
     @property
@@ -95,6 +114,13 @@ class ValueBet:
 
     def to_row(self) -> Dict:
         return asdict(self)
+
+
+def clv_priority_key(bet: "ValueBet") -> tuple:
+    """Rank bets by expected CLV first (the profit-predictive metric), with taken
+    value as the tiebreaker. Used everywhere bets compete for selection/capital."""
+    return (bet.exp_clv if bet.exp_clv is not None else 0.0,
+            bet.edge if bet.edge is not None else 0.0)
 
 
 @dataclass
@@ -118,3 +144,43 @@ class PlacementResult:
 
     def to_row(self) -> Dict:
         return asdict(self)
+
+
+@dataclass
+class FairLine:
+    """A fair (de-vigged) probability estimate for one event/market, from the
+    truth source (Pinnacle). ``probs`` maps selection name -> win probability and
+    sums to ~1.0."""
+
+    event_key: str          # truth-source event id
+    sport_key: str
+    commence_time: str
+    home_team: str
+    away_team: str
+    market: str
+    probs: Dict[str, float] = field(default_factory=dict)
+    source: str = "pinnacle"
+    last_update: Optional[str] = None  # ISO timestamp of the underlying line
+    overround: Optional[float] = None  # booksum of the underlying odds (quality signal)
+
+    def fair_price(self, selection: str) -> Optional[float]:
+        p = self.probs.get(selection)
+        return (1.0 / p) if p and p > 0 else None
+
+
+@dataclass
+class VenueQuote:
+    """A back price available on the betting venue (Betfair Exchange) for one
+    runner, with the ids needed to place on it directly."""
+
+    venue: str               # "betfair"
+    market_id: str
+    selection_id: str
+    runner_name: str
+    price: float             # best decimal back price available
+    size: float              # amount available to back at that price
+    event_name: str
+    home_team: str
+    away_team: str
+    commence_time: str
+    market: str              # e.g. "h2h"

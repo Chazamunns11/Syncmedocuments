@@ -36,8 +36,9 @@ class TheOddsAPIProvider(OddsProvider):
         self.timeout = timeout
 
     def fetch(self, sport_key: str, markets: List[str]) -> List[MarketBoard]:
-        # Imported lazily so the rest of the package works without `requests`.
-        import requests
+        import logging
+
+        from ..http import get_json
 
         params = {
             "apiKey": self.api_key,
@@ -51,9 +52,12 @@ class TheOddsAPIProvider(OddsProvider):
             params["regions"] = self.regions
 
         url = f"{API_ROOT}/sports/{sport_key}/odds"
-        resp = requests.get(url, params=params, timeout=self.timeout)
-        resp.raise_for_status()
-        return self._parse(resp.json(), sport_key, markets)
+        data, headers = get_json(url, params=params, timeout=self.timeout)
+        remaining = headers.get("x-requests-remaining")
+        if remaining is not None:
+            logging.getLogger("value_bot").info(
+                "Odds API quota remaining: %s", remaining)
+        return self._parse(data, sport_key, markets)
 
     @staticmethod
     def _parse(data, sport_key: str, markets: List[str]) -> List[MarketBoard]:

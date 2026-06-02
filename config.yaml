@@ -1,38 +1,113 @@
 # Value betting bot configuration.
-# Secrets (API keys, Betfair login) come from environment variables, NOT here.
-# See .env.example.
+# Secrets (API keys, Betfair/Pinnacle logins) come from environment variables,
+# NOT here. See .env.example.
 
-# --- what to scan ---
-provider: sample            # "sample" (offline demo) or "the_odds_api"
+# === pipeline mode ===
+# pinnacle_betfair : value Betfair Exchange prices against Pinnacle (truth) and
+#                    place on Betfair. Recommended if you're limited on soft books.
+# multi_book       : classic cross-bookmaker value scan from a single odds feed.
+mode: pinnacle_betfair
+
+# === source of truth (fair probability model) ===
+# weighted : weighted Power-Method consensus across sharp + soft books
+#            (practitioner method, validated; most accurate default)
+# pinnacle : single sharp book (Pinnacle), de-vigged
+# consensus: Kaunitz et al. -> 1/mean(odds) - alpha  (bias corrected)
+# blend    : average of pinnacle and weighted estimates
+truth_model: weighted
+book_weights:                  # weight sharp books higher in the consensus
+  pinnacle: 3.0
+  _default: 1.0
+consensus_min_books: 3         # min bookmakers required to form a consensus
+consensus_alpha: 0.05          # Kaunitz bias term (used by truth_model: consensus)
+consensus_recency_halflife_seconds: 0   # >0 = weight fresher quotes more
+
+pinnacle_source: sample        # sample | the_odds_api | direct
+                               # also selects the data feed for weighted/consensus
+pinnacle_sports:
+  - soccer_epl                 # odds-api sport key (the_odds_api/sample);
+                               # use "soccer" etc. for pinnacle_source: direct
+devig_method: power            # power | shin | multiplicative | additive
+                               # power/shin correct favourite-longshot bias best
+
+# === betting venue: Betfair Exchange ===
+venue_source: sample           # sample | betfair
+betfair_event_type: soccer     # soccer | tennis | basketball | ... (see code)
+betfair_competition_ids: []    # optional Betfair competition id filter
+betfair_commission: 0.05       # commission on net winnings (UK base rate 5%)
+betfair_market_start_within_hours: 72
+betfair_premium_charge_rate: 0.0   # set your Premium Charge rate for net P&L
+max_line_age_seconds: 0        # >0 = drop fair lines older than this (anti-stale)
+cancel_unmatched_in_play: true # cancel resting orders that go in-play (live)
+
+# === event matching (pinnacle <-> betfair) ===
+match_min_team_score: 0.80     # strict: avoid betting the wrong game
+match_start_window_minutes: 90 # max kickoff-time difference to pair an event
+match_ambiguity_margin: 0.08   # reject if 2nd-best match is this close
+
+# === value detection ===
+reference_books:
+  - pinnacle
+min_edge: 0.02                 # require >= 2% overlay AFTER commission + haircut
+min_price: 1.30
+max_price: 15.0
+edge_haircut: 0.01             # subtract from edge for estimation error/slippage
+min_liquidity: 10.0            # min money (in stake currency) available to back
+max_overround: 1.15            # skip Pinnacle markets wider than this booksum
+min_expected_clv: 0.0          # only bet when expected CLV exceeds this (>0 = +CLV)
+one_bet_per_event: true        # never place more than one bet on a single event
+
+# === sharp line-movement (Betfair is itself sharp — exploit the LAG) ===
+# Never bet when the sharp consensus is moving AWAY from your pick (a falling-
+# knife trap: Betfair's price will drop and you'd be picked off / -CLV).
+block_adverse_sharp_move: true
+adverse_move_threshold: 0.02   # fair-prob drop (2pp) over the window that blocks
+# Opt-in: ONLY bet when the sharp has moved TOWARD your pick and Betfair is
+# lagging (the actual exploitable moment). Stricter, fewer, higher-conviction.
+require_sharp_move: false
+min_sharp_move: 0.01
+sharp_move_window_seconds: 900 # lookback window for "recent" movement
+
+# === continuous / near-kickoff scheduling (used by `run.py watch`) ===
+poll_interval_seconds: 60      # cadence when nothing is near kickoff
+refresh_interval_seconds: 5    # cadence when an event is inside its place window
+place_window_minutes: 3        # start placing this long before kickoff (sharp line)
+min_seconds_before_start: 20   # stop placing this close to kickoff (avoid in-play)
+
+# === staking / bankroll ===
+bankroll: 1000.0               # your budget / starting bank
+kelly_multiplier: 0.20         # 15-20% Kelly is the practitioner range
+flat_stake:                    # set a number for a FIXED stake per bet (overrides Kelly)
+max_fraction_per_bet: 0.02
+min_stake: 1.0
+max_stake: 100.0               # bet size cap
+max_total_exposure_fraction: 0.10
+compound_bankroll: true        # grow/shrink the bank with realised P&L
+
+# === risk management / circuit breakers ===
+daily_stake_limit_fraction: 0.25   # max staked per day vs bankroll
+max_open_bets: 25                  # max simultaneous open positions
+max_open_exposure_fraction: 0.25   # max unsettled stake vs bankroll
+max_bets_per_day: 200
+stop_loss_fraction: 0.30           # halt if drawdown from peak exceeds this
+min_bankroll_fraction: 0.50        # halt if bankroll falls below this fraction
+
+# === execution ===
+executor: betfair              # betfair | paper. Falls back to paper unless live.
+live: false                    # MUST be true to place real bets on Betfair
+betfair_dry_run: true          # resolve markets but don't send live orders
+paper_slippage: 0.0
+paper_fill_probability: 1.0
+
+# === multi_book mode only ===
+provider: sample               # sample | the_odds_api
+regions: uk,eu
 sports:
   - soccer_epl
 markets:
-  - h2h                     # head-to-head / moneyline
-regions: uk,eu
+  - h2h
 
-# --- value detection ---
-reference_books:            # sharp book(s) used to estimate the fair price
-  - pinnacle
-devig_method: multiplicative   # multiplicative | additive | shin
-min_edge: 0.02              # require >= 2% overlay vs fair price
-min_price: 1.30
-max_price: 15.0
-
-# --- staking / bankroll ---
-bankroll: 1000.0
-kelly_multiplier: 0.25      # quarter-Kelly (conservative)
-max_fraction_per_bet: 0.02  # never stake more than 2% of bankroll on one bet
-min_stake: 1.0
-max_stake: 100.0
-max_total_exposure_fraction: 0.10  # cap total staked per run at 10% of bankroll
-
-# --- execution ---
-executor: paper             # "paper" (safe default) or "betfair"
-live: false                 # MUST be true to place real bets via betfair
-paper_slippage: 0.0
-paper_fill_probability: 1.0
-betfair_dry_run: true       # resolve markets but don't send live orders
-
-# --- storage ---
+# === storage / logging ===
 db_path: bets.db
 csv_path: bets.csv
+log_file:                      # set a path to also write logs (overnight runs)
