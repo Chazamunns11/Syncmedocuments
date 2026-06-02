@@ -344,7 +344,7 @@ class ValueBettingBot:
         executor = self.executor()
         results: List[Tuple[ValueBet, PlacementResult]] = []
         placed_events = set()
-        # Circuit breakers: if a global limit is hit, place nothing this cycle.
+        # Global circuit-breaker check: if a limit is already hit, bet nothing.
         ok, reason = self.risk.status(self.bankroll.bankroll)
         if not ok:
             log.warning("RISK HALT: %s — no bets placed", reason)
@@ -354,6 +354,13 @@ class ValueBettingBot:
             if dedup and (bet.event_id in placed_events
                           or self.store.already_placed_event(bet.event_id)):
                 continue
+            # Re-check breakers BEFORE EACH bet so the per-day count / stake /
+            # exposure caps can't be blown past within a single batch.
+            ok, reason = self.risk.status(self.bankroll.bankroll)
+            if not ok:
+                log.warning("RISK HALT: %s — stopping placement", reason)
+                self.notifier.halt(reason)
+                break
             # Cap the stake to remaining daily and open-exposure budgets.
             capped = self.risk.cap_stake(bet.stake, self.bankroll.bankroll)
             if capped < self.cfg.min_stake:

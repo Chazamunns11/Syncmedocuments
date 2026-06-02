@@ -15,6 +15,7 @@ Set ``dry_run=True`` to resolve/validate without sending an order.
 from __future__ import annotations
 
 import difflib
+import uuid
 from typing import Optional
 
 from ..betfair_client import BetfairClient
@@ -95,10 +96,12 @@ class BetfairExecutor:
 
         ref = f"{market_id}:{selection_id}"
         if self.dry_run:
+            # Make the ref unique so per-placement UPDATEs (settle/CLV) can never
+            # touch more than one row, even if the same runner is staged twice.
             return PlacementResult(
                 bet_key=bet.key, executor=self.name, status="DRY_RUN",
                 requested_price=bet.price, requested_stake=bet.stake,
-                external_ref=ref,
+                external_ref=f"{ref}:{uuid.uuid4().hex[:8]}",
                 message=f"resolved runner (score {score:.2f}); dry_run, not sent",
             )
 

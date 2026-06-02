@@ -110,14 +110,26 @@ class EventMatcher:
                 for sel, p in best_fl.probs.items() if p > 0
             ]
             betfair_outcomes = []
+            used_selections = set()
+            collision = False
             for q in mkt_quotes:
                 sel = self._align_runner(q.runner_name, best_fl)
                 if sel is None:
                     continue
+                # Two runners aligning to the SAME selection means we can't tell
+                # them apart -> would bet the wrong runner. Reject the board.
+                if sel in used_selections:
+                    collision = True
+                    break
+                used_selections.add(sel)
                 betfair_outcomes.append(
                     Outcome(name=sel, price=q.price, selection_id=q.selection_id,
                             size=q.size)
                 )
+            if collision:
+                log.warning("ambiguous runner alignment for %s — skipping",
+                            mkt_quotes[0].event_name)
+                continue
             if not betfair_outcomes:
                 continue
 

@@ -75,10 +75,12 @@ class ContinuousRunner:
         return None if epoch is None else epoch - self.now_fn()
 
     def _is_due(self, bet: ValueBet) -> bool:
-        """In the placement window and not yet (basically) started."""
+        """In the placement window and not yet (basically) started. Events with
+        an unknown/unparseable start time are NOT placed — we can't guarantee
+        proximity to kickoff, and betting far from the off defeats the accuracy."""
         s = self._seconds_to_start(bet)
         if s is None:
-            return True  # unknown start time -> act now rather than never
+            return False
         return self.min_seconds_before_start <= s <= self.place_window
 
     def _next_sleep(self, bets: List[ValueBet]) -> float:
@@ -124,12 +126,11 @@ class ContinuousRunner:
             board = boards.get(event_id)
             if board is None:
                 continue  # no fresh price available to snapshot yet
-            secs = None
             epoch = _to_epoch(board.commence_time)
-            if epoch is not None:
-                secs = epoch - self.now_fn()
-                if secs > self.closing_capture_seconds:
-                    continue  # not close enough to kickoff yet
+            if epoch is None:
+                continue  # unknown kickoff -> can't take a trustworthy close
+            if epoch - self.now_fn() > self.closing_capture_seconds:
+                continue  # not close enough to kickoff yet
             selection = (row["bet_key"].split("|") + ["", "", ""])[2]
             fair = self.bot.fair_price_for(event_id, selection)
             market = self.bot.market_price_for(event_id, selection)

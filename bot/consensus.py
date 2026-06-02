@@ -26,6 +26,7 @@ import math
 import statistics
 from typing import Dict, List, Optional
 
+from .aliases import similarity
 from .devig import booksum, devig
 from .models import FairLine, MarketBoard
 
@@ -51,11 +52,12 @@ PAPER_ALPHA = {"home": 0.034, "draw": 0.057, "away": 0.037}
 
 
 def _role(selection: str, home: str, away: str) -> str:
-    if selection.lower() in {"draw", "the draw"}:
+    """Map a selection name to home/draw/away robustly (tolerant of case,
+    whitespace and aliases), so the Kaunitz bias term is applied to the right
+    side even when names differ slightly across sources."""
+    if selection.lower().strip() in {"draw", "the draw", "tie"}:
         return "draw"
-    if selection == away:
-        return "away"
-    return "home"  # default/home
+    return "away" if similarity(selection, away) > similarity(selection, home) else "home"
 
 
 def _weighted_line(board: MarketBoard, book_weights: Dict[str, float],

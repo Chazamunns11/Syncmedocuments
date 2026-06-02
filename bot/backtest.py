@@ -209,7 +209,11 @@ def run_backtest(
         clv = None
         close_books = _discover_books(row, closing=True)
         if len(close_books) >= 1:
-            cboard = _board_from_books(home, away, when, close_books)
+            # Relabel closing prefixes to their base book (PSC->PS, B365C->B365)
+            # so the sharp-book weights apply to the closing consensus too.
+            relabelled = {(p[:-1] if p.endswith("C") else p): o
+                          for p, o in close_books.items()}
+            cboard = _board_from_books(home, away, when, relabelled)
             cfl = consensus_lines_from_boards(
                 [cboard], method=method, book_weights=book_weights,
                 devig_method=devig_method, alpha=alpha, min_books=1)

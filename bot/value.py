@@ -162,8 +162,8 @@ class ValueDetector:
         for book in board.books:
             if book.bookmaker.lower() in self.exclude_books:
                 continue
-            # Never bet against the truth book itself.
-            if board.fair_source and book.bookmaker == board.fair_source:
+            # Never bet against the truth book itself (case-insensitive).
+            if board.fair_source and book.bookmaker.lower() == board.fair_source.lower():
                 continue
             for outcome in book.outcomes:
                 p = fair.get(outcome.name)
@@ -173,8 +173,9 @@ class ValueDetector:
                 if price < self.min_price or price > self.max_price:
                     continue
                 # Liquidity filter: only bet where there's enough money to back.
-                if (self.min_liquidity > 0 and outcome.size is not None
-                        and outcome.size < self.min_liquidity):
+                # Fail closed — if liquidity is required but unknown, skip.
+                if self.min_liquidity > 0 and (outcome.size is None
+                                               or outcome.size < self.min_liquidity):
                     continue
                 eff_price = self._effective_price(price)
                 fair_price = 1.0 / p

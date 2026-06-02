@@ -64,7 +64,11 @@ class TestBetfairPlacement(unittest.TestCase):
         ex = BetfairExecutor(client=_FakeClientForExec(None), dry_run=True)
         res = ex.place(_bet())
         self.assertEqual(res.status, "DRY_RUN")
-        self.assertEqual(res.external_ref, "1.23:4567")
+        # Ref is the market:selection plus a unique suffix (so settle/CLV UPDATEs
+        # can never touch more than one row).
+        self.assertTrue(res.external_ref.startswith("1.23:4567:"))
+        # Two placements of the same runner get distinct refs.
+        self.assertNotEqual(ex.place(_bet()).external_ref, res.external_ref)
 
     def test_matched_order_parsed(self):
         report = _Report("SUCCESS", [_Instr(size_matched=10.0, avg=2.18,
