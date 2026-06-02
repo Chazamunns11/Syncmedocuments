@@ -16,6 +16,22 @@ from .base import OddsProvider
 API_ROOT = "https://api.the-odds-api.com/v4"
 
 
+def list_active_sports(api_key: str, timeout: float = 15.0) -> list:
+    """Return the sport keys The Odds API currently has live (in-season), as a
+    list of (key, title) tuples. Use this to pick valid pinnacle_sports keys —
+    seasonal keys (e.g. tennis_atp_aus_open) 404 when the event isn't on."""
+    from ..http import get_json
+    if not api_key:
+        raise ValueError("ODDS_API_KEY required to list sports")
+    data, _ = get_json(f"{API_ROOT}/sports", params={"apiKey": api_key},
+                       timeout=timeout)
+    out = []
+    for s in data or []:
+        if s.get("active") and not s.get("has_outrights", False):
+            out.append((s.get("key"), s.get("title")))
+    return out
+
+
 class TheOddsAPIProvider(OddsProvider):
     name = "the_odds_api"
 

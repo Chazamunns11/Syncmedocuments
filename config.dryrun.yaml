@@ -25,25 +25,20 @@ pinnacle_source: the_odds_api   # only used if truth_model: pinnacle
 # betfair_event_types = Betfair event-type names (the venue feed).
 # The matcher reconciles the two by team/player names + kickoff time.
 # Start with clean 2-/3-way h2h sports; AVOID horse racing & golf (not h2h).
+# SPORT KEYS ARE SEASONAL. Run `python run.py --config config.dryrun.yaml sports`
+# to list what's LIVE right now, then put those keys here. (e.g. tennis_atp_* only
+# exists during a tournament; many soccer leagues are off in June.) Keep this list
+# to keys that appear in `sports` output, or you'll get harmless 404s.
 pinnacle_sports:
-  - soccer_epl
-  - soccer_spain_la_liga
-  - soccer_germany_bundesliga
-  - soccer_italy_serie_a
-  - soccer_france_ligue_one
-  - soccer_uefa_champs_league
-  - basketball_nba          # high volume, clean 2-way
-  - tennis_atp_aus_open     # tennis = lots of daily 2-way matches (swap to the
-  - tennis_wta_aus_open     #   current tournament keys in season)
-  # - baseball_mlb          # add in season for more volume
-  # - icehockey_nhl
+  - soccer_uefa_champs_league   # replace with whatever `sports` shows as live
+  - basketball_nba
+  - baseball_mlb
 
+# betfair_event_types must cover the same sports (Betfair's own naming).
 betfair_event_types:
   - soccer
   - basketball
-  - tennis
-  # - baseball
-  # - ice_hockey
+  - baseball
 
 markets: [h2h]                # match-odds only (cleanest signal)
 regions: [uk, eu]

@@ -359,6 +359,25 @@ def cmd_validate(cfg: Config, min_n: int) -> int:
         bot.close()
 
 
+def cmd_sports(cfg: Config) -> int:
+    """List the sport keys The Odds API currently has live (for pinnacle_sports)."""
+    from bot.providers.the_odds_api import list_active_sports
+    if not cfg.odds_api_key:
+        print("Set ODDS_API_KEY in .env first.")
+        return 1
+    try:
+        sports = list_active_sports(cfg.odds_api_key)
+    except Exception as exc:
+        print(f"Could not list sports: {exc}")
+        return 1
+    print(f"\n{len(sports)} live sport keys (use these in pinnacle_sports):\n")
+    for key, title in sorted(sports):
+        print(f"  {key:<32} {title}")
+    print("\nTip: pick the ones you want and put them under 'pinnacle_sports' in "
+          "your config. Soccer keys also need the matching betfair_event_types.")
+    return 0
+
+
 def cmd_settle(cfg: Config, ref: str, result: str) -> int:
     bot = ValueBettingBot(cfg)
     try:
@@ -408,6 +427,7 @@ def main(argv=None) -> int:
                            help="is the edge real? go/no-go on captured CLV")
     p_val.add_argument("--min-bets", type=int, default=100,
                        help="minimum bets before trusting CLV (default 100)")
+    sub.add_parser("sports", help="list sport keys The Odds API currently has live")
     sub.add_parser("status", help="dashboard: bankroll, exposure, risk, CLV")
     sub.add_parser("doctor", help="preflight checks before going live")
     p_settle = sub.add_parser("settle", help="mark a placed bet WON/LOST/VOID")
@@ -446,6 +466,8 @@ def main(argv=None) -> int:
         return cmd_backtest(cfg, args)
     if args.command == "report":
         return cmd_report(cfg)
+    if args.command == "sports":
+        return cmd_sports(cfg)
     if args.command == "validate":
         return cmd_validate(cfg, args.min_bets)
     if args.command == "status":
