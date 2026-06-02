@@ -17,7 +17,7 @@ import statistics
 from typing import List, Optional
 
 from .devig import devig
-from .models import MarketBoard, ValueBet
+from .models import MarketBoard, ValueBet, clv_priority_key
 
 
 def kelly_fraction(prob: float, price: float) -> float:
@@ -226,10 +226,11 @@ class ValueDetector:
         bets: List[ValueBet] = []
         for board in boards:
             bets.extend(self.detect_board(board))
-        # Best edge first.
-        bets.sort(key=lambda b: b.edge, reverse=True)
+        # Prioritise the highest expected CLV first (edge breaks ties). CLV — how
+        # much we beat the close — is the metric that actually predicts profit.
+        bets.sort(key=clv_priority_key, reverse=True)
         if self.one_per_event:
-            # Keep only the single best-edge bet per event.
+            # Keep only the single highest-CLV bet per event.
             seen = set()
             unique = []
             for b in bets:

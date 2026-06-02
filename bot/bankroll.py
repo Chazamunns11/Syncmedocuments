@@ -14,7 +14,7 @@ from __future__ import annotations
 
 from typing import List, Optional
 
-from .models import ValueBet
+from .models import ValueBet, clv_priority_key
 
 
 class BankrollManager:
@@ -64,13 +64,13 @@ class BankrollManager:
         return self._round(stake)
 
     def assign(self, bets: List[ValueBet]) -> List[ValueBet]:
-        """Assign stakes in-place (best edge first) honouring the total exposure
-        cap. Bets that would breach the cap, or round below ``min_stake``, get a
-        stake of 0 and are filtered out."""
+        """Assign stakes in-place, funding the HIGHEST expected-CLV bets first so
+        scarce exposure goes to the bets most likely to beat the close. Bets that
+        breach the cap, or round below ``min_stake``, get stake 0 and are dropped."""
         budget = self.max_total_exposure_fraction * self.bankroll
         spent = 0.0
         staked: List[ValueBet] = []
-        for bet in sorted(bets, key=lambda b: b.edge, reverse=True):
+        for bet in sorted(bets, key=clv_priority_key, reverse=True):
             stake = self.stake_for(bet)
             if stake <= 0:
                 continue

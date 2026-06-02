@@ -116,6 +116,13 @@ class ValueBet:
         return asdict(self)
 
 
+def clv_priority_key(bet: "ValueBet") -> tuple:
+    """Rank bets by expected CLV first (the profit-predictive metric), with taken
+    value as the tiebreaker. Used everywhere bets compete for selection/capital."""
+    return (bet.exp_clv if bet.exp_clv is not None else 0.0,
+            bet.edge if bet.edge is not None else 0.0)
+
+
 @dataclass
 class PlacementResult:
     """Outcome of attempting to place a bet through an executor."""
