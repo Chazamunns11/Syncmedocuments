@@ -28,8 +28,9 @@ export default async function PipelinePage() {
       {/* Add deal */}
       <form action={createDeal} className="card mt-6">
         <p className="label">Add a deal</p>
-        <div className="grid gap-3 sm:grid-cols-3">
+        <div className="grid gap-3 sm:grid-cols-4">
           <input name="title" className="input sm:col-span-2" placeholder="e.g. Sarah — 12-week package" />
+          <input name="value" className="input" placeholder="Value (e.g. 1200)" inputMode="decimal" />
           <select name="stage_id" className="input" defaultValue={stages[0]?.id}>
             {stages.map((s) => (
               <option key={s.id} value={s.id}>{s.name}</option>

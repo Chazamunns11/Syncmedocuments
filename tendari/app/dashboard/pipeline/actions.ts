@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { getAccount } from "@/lib/account";
 import { verifyContactId } from "@/lib/contact";
+import { parseMoneyToCents } from "@/lib/format";
 
 export async function createDeal(formData: FormData) {
   const account = await getAccount();
@@ -22,6 +23,7 @@ export async function createDeal(formData: FormData) {
   if (!stage) return;
 
   const contact_id = await verifyContactId(supabase, String(formData.get("contact_id") || "") || null);
+  const value_cents = parseMoneyToCents(String(formData.get("value") || ""));
 
   await supabase.from("deals").insert({
     account_id: account.accountId,
@@ -29,8 +31,20 @@ export async function createDeal(formData: FormData) {
     stage_id,
     contact_id,
     title,
+    value_cents,
   });
 
+  revalidatePath("/dashboard/pipeline");
+}
+
+/** Mark a deal won, lost, or back to open. Called from the board (Client Component). */
+export async function setDealStatus(id: string, status: "open" | "won" | "lost") {
+  if (!id || !["open", "won", "lost"].includes(status)) return;
+  const supabase = createClient();
+  await supabase
+    .from("deals")
+    .update({ status, updated_at: new Date().toISOString() })
+    .eq("id", id);
   revalidatePath("/dashboard/pipeline");
 }
 
