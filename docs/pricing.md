@@ -32,6 +32,7 @@ traction + testimonials; grandfather as prices rise.
 
 ### MRR math (blended ~$60 ARPU)
 $1k ≈ 17 customers · $5k ≈ 85 · **$10k ≈ ~145** · $30k ≈ ~430.
+Full cost-to-run and profit-per-customer breakdown: **`unit-economics.md`** (Pro ≈ $59 profit/mo, ~85%).
 
 ---
 

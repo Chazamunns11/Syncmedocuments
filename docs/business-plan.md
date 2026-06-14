@@ -66,12 +66,14 @@ follow-ups, summarizes calls, and proposes next actions — human-approved, neve
    refer coaches — flat referral, not a white-label reseller scheme).
 5. **Product-led:** booking page is a public, branded acquisition surface ("Powered by Tend").
 
-## 7. Financial model (illustrative)
-- **Infra baseline:** ~$0 at MVP (free tiers) → ~$150–250/mo once live (Supabase Pro + hosting + email).
-- **Gross margin:** ~80%+ on the CRM; SMS/email/AI priced as at-cost-overage credits to protect margin.
-- **Variable COGS per customer (Pro tier, typical):** email ~$2–5, AI ~$1–4, SMS pass-through.
-- **MRR milestones** (blended ~$60 ARPU):
-  - $1k MRR ≈ 17 customers · $5k ≈ 85 · **$10k ≈ ~145 Pro customers** · $30k ≈ ~430.
+## 7. Financial model (illustrative — full detail in `docs/unit-economics.md`)
+- **Infra baseline:** ~$0 at MVP (free tiers) → ~$300/mo even at $10k MRR (Supabase + hosting + email).
+- **Variable COGS per customer:** ~$3 (Solo) / ~$10 (Pro, w/ SMS) — email, AI, SMS, Stripe fee on our sub.
+- **Profit per customer/mo:** Solo ~$26 (90%) · **Pro ~$59 (85%)** · Studio ~$124 (83%).
+- **Gross margin:** ~80%+; SMS/email/AI priced as at-cost-overage credits to protect margin.
+- **MRR milestones** (blended ~$60 ARPU): $1k ≈ 15–17 · $5k ≈ 75–85 · **$10k ≈ ~150 Pro (~$8.2k gross
+  profit/mo)** · $30k ≈ ~430 (~$24–25k gross profit/mo).
+- **Infra break-even:** ~2–3 paying customers. Real constraints are founder time + CAC, not infra.
 - **Unit economics target:** keep CAC low via content/community (not paid ads initially); annual
   billing for cash flow; aim LTV:CAC > 3 within 12 months.
 

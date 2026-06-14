@@ -10,6 +10,8 @@ specifically for solo online coaches. *(Name is provisional — see business pla
 - **[business-plan.md](business-plan.md)** — name, problem, ICP, positioning, GTM, financials, risks.
 - **[pricing.md](pricing.md)** — recommended tiers ($29 / $69 / $149), rationale, anti-bill-shock model,
   unit costs, competitive landscape.
+- **[unit-economics.md](unit-economics.md)** — cost to run, profit per customer (~$59/Pro/mo, ~85% margin),
+  fixed costs by stage, MRR milestones.
 - **specs/**
   - **[technical-spec.md](specs/technical-spec.md)** — architecture, stack, modules, security, NFRs.
   - **[data-model.md](specs/data-model.md)** — Postgres schema (Supabase + RLS).
