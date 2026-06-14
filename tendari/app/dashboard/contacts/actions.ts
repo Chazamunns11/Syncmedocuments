@@ -36,6 +36,50 @@ export async function deleteContact(formData: FormData) {
   revalidatePath("/dashboard/contacts");
 }
 
+export async function importContacts(formData: FormData) {
+  const account = await getAccount();
+  if (!account) return;
+  const raw = String(formData.get("csv") || "").trim();
+  if (!raw) return;
+
+  // Parse simple CSV: columns first_name, last_name, email, phone (header optional).
+  const lines = raw.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+  if (lines.length === 0) return;
+  const first = lines[0].toLowerCase();
+  const hasHeader = first.includes("email") || first.includes("first") || first.includes("name");
+  const rows = (hasHeader ? lines.slice(1) : lines).map((line) => {
+    const [first_name = "", last_name = "", email = "", phone = ""] = line
+      .split(",")
+      .map((c) => c.trim());
+    return {
+      first_name,
+      last_name,
+      email: email || null,
+      phone: phone || null,
+    };
+  }).filter((r) => r.first_name || r.email);
+
+  if (rows.length === 0) return;
+
+  const supabase = createClient();
+
+  // Skip emails that already exist in this account (the unique index would
+  // otherwise fail the whole batch).
+  const { data: existing } = await supabase.from("contacts").select("email");
+  const seen = new Set(
+    (existing || []).map((e: { email: string | null }) => (e.email || "").toLowerCase()).filter(Boolean),
+  );
+
+  const toInsert = rows
+    .filter((r) => !r.email || !seen.has(r.email.toLowerCase()))
+    .map((r) => ({ ...r, account_id: account.accountId, source: "import" }));
+
+  if (toInsert.length > 0) {
+    await supabase.from("contacts").insert(toInsert);
+  }
+  revalidatePath("/dashboard/contacts");
+}
+
 export async function updateContact(formData: FormData) {
   const id = String(formData.get("id") || "");
   if (!id) return;

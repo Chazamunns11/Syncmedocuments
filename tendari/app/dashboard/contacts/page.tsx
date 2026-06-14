@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { contactName, contactInitial } from "@/lib/contact";
-import { addContact, deleteContact } from "./actions";
+import { addContact, deleteContact, importContacts } from "./actions";
 
 type Contact = {
   id: string;
@@ -58,6 +58,25 @@ export default async function ContactsPage({
           <button className="btn-primary">Add contact</button>
         </div>
       </form>
+
+      {/* Import from CSV */}
+      <details className="card mt-4">
+        <summary className="cursor-pointer text-sm font-medium text-deep-green">Import from CSV</summary>
+        <p className="mt-2 text-xs text-muted">
+          One contact per line: <code>first name, last name, email, phone</code>. A header row is optional.
+          Existing emails are skipped. Moving from another tool? Paste your export here.
+        </p>
+        <form action={importContacts} className="mt-3">
+          <textarea
+            name="csv"
+            className="input min-h-28 font-mono text-xs"
+            placeholder={"Sarah, Lee, sarah@example.com, 07700 900001\nTom, Avery, tom@example.com"}
+          />
+          <div className="mt-3">
+            <button className="btn-primary">Import contacts</button>
+          </div>
+        </form>
+      </details>
 
       {/* Search */}
       <form method="get" className="mt-6">
