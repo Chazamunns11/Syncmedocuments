@@ -5,6 +5,7 @@ import { contactName, contactInitial } from "@/lib/contact";
 import { formatDateTime } from "@/lib/format";
 import { getAccount } from "@/lib/account";
 import { updateContact, addNote, deleteContact } from "../actions";
+import { addTagByName, removeContactTag } from "../tag-actions";
 import { createDeal } from "../../pipeline/actions";
 import { addTask, toggleTask } from "../../tasks/actions";
 
@@ -12,6 +13,7 @@ type Activity = { id: string; type: string; body: string | null; title: string |
 type Deal = { id: string; title: string; stage_id: string };
 type Stage = { id: string; name: string };
 type Task = { id: string; title: string; done: boolean; due_on: string | null };
+type TagLink = { tag_id: string; tags: { name: string } | { name: string }[] | null };
 
 export default async function ContactDetailPage({ params }: { params: { id: string } }) {
   const supabase = createClient();
@@ -26,7 +28,7 @@ export default async function ContactDetailPage({ params }: { params: { id: stri
 
   if (!contact) notFound();
 
-  const [{ data: acts }, { data: dealRows }, { data: stageRows }, { data: taskRows }] =
+  const [{ data: acts }, { data: dealRows }, { data: stageRows }, { data: taskRows }, { data: tagRows }] =
     await Promise.all([
       supabase
         .from("activities")
@@ -40,12 +42,17 @@ export default async function ContactDetailPage({ params }: { params: { id: stri
         .select("id, title, done, due_on")
         .eq("contact_id", params.id)
         .order("done", { ascending: true }),
+      supabase.from("contact_tags").select("tag_id, tags(name)").eq("contact_id", params.id),
     ]);
 
   const activities = (acts as Activity[]) || [];
   const deals = (dealRows as Deal[]) || [];
   const stages = (stageRows as Stage[]) || [];
   const tasks = (taskRows as Task[]) || [];
+  const tags = ((tagRows as TagLink[]) || []).map((r) => {
+    const t = Array.isArray(r.tags) ? r.tags[0] : r.tags;
+    return { tag_id: r.tag_id, name: t?.name ?? "" };
+  });
   const stageName = (id: string) => stages.find((s) => s.id === id)?.name ?? "";
   const firstStage = stages[0]?.id ?? "";
 
@@ -84,6 +91,29 @@ export default async function ContactDetailPage({ params }: { params: { id: stri
               <button className="btn-primary">Save changes</button>
             </div>
           </form>
+
+          {/* Tags */}
+          <div className="card mt-4">
+            <p className="label">Tags</p>
+            <div className="mb-3 flex flex-wrap gap-2">
+              {tags.length === 0 && <span className="text-sm text-muted">No tags yet.</span>}
+              {tags.map((t) => (
+                <span key={t.tag_id} className="inline-flex items-center gap-1 rounded-full bg-mint px-2.5 py-1 text-xs text-deep-green">
+                  {t.name}
+                  <form action={removeContactTag} className="inline">
+                    <input type="hidden" name="contact_id" value={contact.id} />
+                    <input type="hidden" name="tag_id" value={t.tag_id} />
+                    <button className="text-deep-green/60 hover:text-red-600" aria-label={`Remove ${t.name}`}>×</button>
+                  </form>
+                </span>
+              ))}
+            </div>
+            <form action={addTagByName} className="flex gap-2">
+              <input type="hidden" name="contact_id" value={contact.id} />
+              <input name="name" className="input" placeholder="Add a tag (e.g. VIP, Lead)" />
+              <button className="btn-primary shrink-0">Add</button>
+            </form>
+          </div>
 
           {/* Deals for this contact */}
           <div className="card mt-4">

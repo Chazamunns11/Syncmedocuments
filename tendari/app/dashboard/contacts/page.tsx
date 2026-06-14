@@ -15,26 +15,39 @@ type Contact = {
 export default async function ContactsPage({
   searchParams,
 }: {
-  searchParams: { q?: string };
+  searchParams: { q?: string; tag?: string };
 }) {
   const supabase = createClient();
   // Strip characters that break the PostgREST `or` filter syntax (, ( ))
   // and LIKE wildcards (% _ *) so search stays literal.
   const q = (searchParams.q || "").replace(/[,()%_*]/g, " ").trim();
+  const tagId = searchParams.tag || "";
 
-  let query = supabase
-    .from("contacts")
-    .select("id, first_name, last_name, email, phone, created_at")
-    .order("created_at", { ascending: false });
+  const { data: allTags } = await supabase.from("tags").select("id, name").order("name");
 
-  if (q) {
-    query = query.or(
-      `first_name.ilike.%${q}%,last_name.ilike.%${q}%,email.ilike.%${q}%`,
-    );
+  // If filtering by tag, resolve the contact ids that carry it first.
+  let tagContactIds: string[] | null = null;
+  if (tagId) {
+    const { data: ct } = await supabase
+      .from("contact_tags")
+      .select("contact_id")
+      .eq("tag_id", tagId);
+    tagContactIds = (ct || []).map((r: { contact_id: string }) => r.contact_id);
   }
 
-  const { data: contacts } = await query;
-  const list = (contacts as Contact[]) || [];
+  let list: Contact[] = [];
+  if (tagContactIds === null || tagContactIds.length > 0) {
+    let query = supabase
+      .from("contacts")
+      .select("id, first_name, last_name, email, phone, created_at")
+      .order("created_at", { ascending: false });
+    if (q) {
+      query = query.or(`first_name.ilike.%${q}%,last_name.ilike.%${q}%,email.ilike.%${q}%`);
+    }
+    if (tagContactIds) query = query.in("id", tagContactIds);
+    const { data: contacts } = await query;
+    list = (contacts as Contact[]) || [];
+  }
 
   return (
     <div>
@@ -78,14 +91,21 @@ export default async function ContactsPage({
         </form>
       </details>
 
-      {/* Search */}
-      <form method="get" className="mt-6">
+      {/* Search + tag filter */}
+      <form method="get" className="mt-6 grid gap-3 sm:grid-cols-[1fr_auto_auto]">
         <input
           name="q"
           defaultValue={q}
           className="input"
           placeholder="Search contacts by name or email…"
         />
+        <select name="tag" defaultValue={tagId} className="input">
+          <option value="">All tags</option>
+          {(allTags as { id: string; name: string }[] | null)?.map((t) => (
+            <option key={t.id} value={t.id}>{t.name}</option>
+          ))}
+        </select>
+        <button className="btn-ghost">Filter</button>
       </form>
 
       {/* List */}
