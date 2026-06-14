@@ -5,6 +5,9 @@ import { DashboardNav } from "@/components/dashboard-nav";
 import { OnboardingTour } from "@/components/onboarding-tour";
 import { getAccount } from "@/lib/account";
 
+// The dashboard is always per-user; never statically cache it.
+export const dynamic = "force-dynamic";
+
 export default async function DashboardLayout({
   children,
 }: {

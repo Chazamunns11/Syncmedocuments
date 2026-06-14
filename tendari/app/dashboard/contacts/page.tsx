@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { addContact, deleteContact } from "./actions";
 
@@ -55,15 +56,15 @@ export default async function ContactsPage() {
               const name = [c.first_name, c.last_name].filter(Boolean).join(" ") || "—";
               return (
                 <li key={c.id} className="flex items-center justify-between px-5 py-3.5">
-                  <div className="flex items-center gap-3">
+                  <Link href={`/dashboard/contacts/${c.id}`} className="flex flex-1 items-center gap-3">
                     <span className="flex h-9 w-9 items-center justify-center rounded-full bg-mint text-sm font-semibold text-deep-green">
                       {(c.first_name?.[0] || c.email?.[0] || "?").toUpperCase()}
                     </span>
                     <div>
-                      <p className="text-sm font-medium text-ink">{name}</p>
+                      <p className="text-sm font-medium text-ink hover:text-forest">{name}</p>
                       <p className="text-xs text-muted">{c.email || c.phone || "No contact details"}</p>
                     </div>
-                  </div>
+                  </Link>
                   <form action={deleteContact}>
                     <input type="hidden" name="id" value={c.id} />
                     <button className="text-xs text-muted hover:text-red-600">Remove</button>
