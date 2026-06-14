@@ -12,6 +12,8 @@ specifically for solo online coaches. *(Name is provisional — see business pla
   unit costs, competitive landscape.
 - **[unit-economics.md](unit-economics.md)** — cost to run, profit per customer (~$59/Pro/mo, ~85% margin),
   fixed costs by stage, MRR milestones.
+- **[branding.md](branding.md)** — naming research, name shortlist (lead candidate **Tendril**;
+  backups Grove, Lodestar), and a finalize-the-name checklist (domain + UK/US trademark).
 - **specs/**
   - **[technical-spec.md](specs/technical-spec.md)** — architecture, stack, modules, security, NFRs.
   - **[data-model.md](specs/data-model.md)** — Postgres schema (Supabase + RLS).
