@@ -6,6 +6,7 @@ export type AccountInfo = {
   userName: string | null;
   businessName: string | null;
   plan: string | null;
+  timezone: string;
 };
 
 /** Returns the signed-in user's account context, or null if not signed in / not provisioned. */
@@ -23,7 +24,7 @@ export async function getAccount(): Promise<AccountInfo | null> {
 
   const { data } = await supabase
     .from("users")
-    .select("account_id, name, accounts(name, plan)")
+    .select("account_id, name, accounts(name, plan, timezone)")
     .eq("id", user.id)
     .single();
 
@@ -36,5 +37,6 @@ export async function getAccount(): Promise<AccountInfo | null> {
     userName: data.name ?? null,
     businessName: account?.name ?? null,
     plan: account?.plan ?? null,
+    timezone: account?.timezone ?? "UTC",
   };
 }

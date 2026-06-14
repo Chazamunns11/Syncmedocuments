@@ -2,6 +2,8 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { contactName, contactInitial } from "@/lib/contact";
+import { formatDateTime } from "@/lib/format";
+import { getAccount } from "@/lib/account";
 import { updateContact, addNote, deleteContact } from "../actions";
 import { createDeal } from "../../pipeline/actions";
 import { addTask, toggleTask } from "../../tasks/actions";
@@ -11,14 +13,10 @@ type Deal = { id: string; title: string; stage_id: string };
 type Stage = { id: string; name: string };
 type Task = { id: string; title: string; done: boolean; due_on: string | null };
 
-function timeAgo(iso: string) {
-  const d = new Date(iso);
-  return d.toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" }) +
-    " · " + d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
-}
-
 export default async function ContactDetailPage({ params }: { params: { id: string } }) {
   const supabase = createClient();
+  const account = await getAccount();
+  const tz = account?.timezone;
 
   const { data: contact } = await supabase
     .from("contacts")
@@ -159,7 +157,7 @@ export default async function ContactDetailPage({ params }: { params: { id: stri
                 {activities.map((a) => (
                   <li key={a.id} className="px-5 py-3.5">
                     <p className="text-sm text-ink">{a.body || a.title || a.type}</p>
-                    <p className="mt-0.5 text-xs text-muted">{timeAgo(a.created_at)}</p>
+                    <p className="mt-0.5 text-xs text-muted">{formatDateTime(a.created_at, tz)}</p>
                   </li>
                 ))}
               </ul>

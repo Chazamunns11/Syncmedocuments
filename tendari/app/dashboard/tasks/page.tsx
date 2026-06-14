@@ -1,22 +1,22 @@
 import { createClient } from "@/lib/supabase/server";
+import { getAccount } from "@/lib/account";
+import { formatDay, todayISOInTz } from "@/lib/format";
 import { addTask, toggleTask, deleteTask } from "./actions";
 
 type Task = { id: string; title: string; due_on: string | null; done: boolean };
 
-function dueLabel(due: string | null) {
+function dueLabel(due: string | null, todayISO: string) {
   if (!due) return null;
-  const d = new Date(due + "T00:00:00");
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const overdue = d < today;
   return {
-    text: d.toLocaleDateString(undefined, { day: "numeric", month: "short" }),
-    overdue,
+    text: formatDay(due),
+    overdue: due < todayISO, // ISO date strings compare correctly lexically
   };
 }
 
 export default async function TasksPage() {
   const supabase = createClient();
+  const account = await getAccount();
+  const todayISO = todayISOInTz(account?.timezone);
   const { data } = await supabase
     .from("tasks")
     .select("id, title, due_on, done")
@@ -46,7 +46,7 @@ export default async function TasksPage() {
         ) : (
           <ul className="divide-y divide-deep-green/10">
             {open.map((t) => {
-              const due = dueLabel(t.due_on);
+              const due = dueLabel(t.due_on, todayISO);
               return (
                 <li key={t.id} className="flex items-center justify-between px-5 py-3.5">
                   <div className="flex items-center gap-3">
