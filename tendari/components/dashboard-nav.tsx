@@ -8,6 +8,7 @@ const links = [
   { href: "/dashboard/contacts", label: "Contacts" },
   { href: "/dashboard/pipeline", label: "Pipeline" },
   { href: "/dashboard/tasks", label: "Follow-ups" },
+  { href: "/dashboard/forms", label: "Lead forms" },
   { href: "/dashboard/settings", label: "Settings" },
   { href: "/dashboard/guide", label: "How to use" },
 ];
