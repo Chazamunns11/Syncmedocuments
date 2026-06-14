@@ -48,6 +48,11 @@ export async function setDealStatus(id: string, status: "open" | "won" | "lost")
   revalidatePath("/dashboard/pipeline");
 }
 
+/** Reopen a closed deal (form action). */
+export async function reopenDeal(formData: FormData) {
+  await setDealStatus(String(formData.get("id") || ""), "open");
+}
+
 /** Move a deal to another stage. Called from the drag-and-drop board (Client Component). */
 export async function moveDealById(id: string, stage_id: string) {
   if (!id || !stage_id) return;

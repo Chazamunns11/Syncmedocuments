@@ -1,28 +1,41 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { getAccount } from "@/lib/account";
+import { formatMoney } from "@/lib/format";
 import { ReplayTourButton } from "@/components/onboarding-tour";
 
 export default async function DashboardHome() {
   const account = await getAccount();
   const supabase = createClient();
 
-  const [{ count: contacts }, { count: openDeals }, { count: openTasks }] = await Promise.all([
+  const now = new Date();
+  const monthStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1)).toISOString();
+
+  const [
+    { count: contacts },
+    { count: openDeals },
+    { count: openTasks },
+    { data: openDealRows },
+    { data: wonRows },
+  ] = await Promise.all([
     supabase.from("contacts").select("*", { count: "exact", head: true }),
-    supabase
-      .from("deals")
-      .select("*", { count: "exact", head: true })
-      .eq("status", "open"),
-    supabase
-      .from("tasks")
-      .select("*", { count: "exact", head: true })
-      .eq("done", false),
+    supabase.from("deals").select("*", { count: "exact", head: true }).eq("status", "open"),
+    supabase.from("tasks").select("*", { count: "exact", head: true }).eq("done", false),
+    supabase.from("deals").select("value_cents").eq("status", "open"),
+    supabase.from("deals").select("value_cents").eq("status", "won").gte("updated_at", monthStart),
   ]);
 
+  const sum = (rows: { value_cents: number }[] | null) =>
+    (rows || []).reduce((s, r) => s + (r.value_cents || 0), 0);
+  const pipelineValue = sum(openDealRows as { value_cents: number }[] | null);
+  const wonThisMonth = sum(wonRows as { value_cents: number }[] | null);
+
   const stats = [
-    { label: "Contacts", value: contacts ?? 0, href: "/dashboard/contacts" },
-    { label: "Open deals", value: openDeals ?? 0, href: "/dashboard/pipeline" },
-    { label: "Follow-ups", value: openTasks ?? 0, href: "/dashboard/tasks" },
+    { label: "Contacts", value: String(contacts ?? 0), href: "/dashboard/contacts" },
+    { label: "Open deals", value: String(openDeals ?? 0), href: "/dashboard/pipeline" },
+    { label: "Pipeline value", value: formatMoney(pipelineValue), href: "/dashboard/pipeline" },
+    { label: "Won this month", value: formatMoney(wonThisMonth), href: "/dashboard/pipeline" },
+    { label: "Follow-ups", value: String(openTasks ?? 0), href: "/dashboard/tasks" },
   ];
 
   const checklist = [
@@ -40,11 +53,11 @@ export default async function DashboardHome() {
       </h1>
       <p className="mt-1 text-muted">Here&apos;s your coaching practice at a glance.</p>
 
-      <div className="mt-8 grid gap-4 sm:grid-cols-3">
+      <div className="mt-8 grid gap-4 grid-cols-2 sm:grid-cols-3 lg:grid-cols-5">
         {stats.map((s) => (
           <Link key={s.label} href={s.href} className="card transition hover:shadow-md">
             <p className="text-sm text-muted">{s.label}</p>
-            <p className="mt-2 text-3xl font-semibold text-deep-green">{s.value}</p>
+            <p className="mt-2 text-2xl font-semibold text-deep-green">{s.value}</p>
           </Link>
         ))}
       </div>
