@@ -3,6 +3,13 @@
 Sequenced so each phase ships something demoable and de-risks the hard parts early.
 Built and maintained with Claude Code. Target: solo founder + AI, lean managed services.
 
+> **Status (built in `tendari/`):** Phase 0 + Phase 1 are implemented and building green —
+> landing page, auth, multi-tenant RLS schema, contacts (CRUD, detail, notes, **tags**, **CSV import**,
+> search), **drag-and-drop pipeline** with deal values/totals/won-lost, **follow-ups (tasks)** with
+> timezone-aware due dates, settings (name + timezone), and the onboarding walkthrough + guide.
+> Remaining phases (booking, payments, automation engine, SMS, AI) need live credentials + the
+> Supabase backend running, so they're next once a project is provisioned.
+
 ---
 
 ## Phase 0 — Foundations (week 1)
