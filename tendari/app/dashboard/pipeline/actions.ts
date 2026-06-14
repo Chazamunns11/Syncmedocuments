@@ -35,13 +35,16 @@ export async function createDeal(formData: FormData) {
 export async function moveDeal(formData: FormData) {
   const id = String(formData.get("id") || "");
   const stage_id = String(formData.get("stage_id") || "");
-  if (!id || !stage_id) return;
+  await moveDealById(id, stage_id);
+}
 
+/** Typed variant for the drag-and-drop board (called from a Client Component). */
+export async function moveDealById(id: string, stage_id: string) {
+  if (!id || !stage_id) return;
   const supabase = createClient();
   await supabase
     .from("deals")
     .update({ stage_id, updated_at: new Date().toISOString() })
     .eq("id", id);
-
   revalidatePath("/dashboard/pipeline");
 }

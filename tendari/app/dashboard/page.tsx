@@ -7,17 +7,22 @@ export default async function DashboardHome() {
   const account = await getAccount();
   const supabase = createClient();
 
-  const [{ count: contacts }, { count: openDeals }] = await Promise.all([
+  const [{ count: contacts }, { count: openDeals }, { count: openTasks }] = await Promise.all([
     supabase.from("contacts").select("*", { count: "exact", head: true }),
     supabase
       .from("deals")
       .select("*", { count: "exact", head: true })
       .eq("status", "open"),
+    supabase
+      .from("tasks")
+      .select("*", { count: "exact", head: true })
+      .eq("done", false),
   ]);
 
   const stats = [
     { label: "Contacts", value: contacts ?? 0, href: "/dashboard/contacts" },
     { label: "Open deals", value: openDeals ?? 0, href: "/dashboard/pipeline" },
+    { label: "Follow-ups", value: openTasks ?? 0, href: "/dashboard/tasks" },
   ];
 
   const checklist = [
@@ -35,7 +40,7 @@ export default async function DashboardHome() {
       </h1>
       <p className="mt-1 text-muted">Here&apos;s your coaching practice at a glance.</p>
 
-      <div className="mt-8 grid gap-4 sm:grid-cols-2">
+      <div className="mt-8 grid gap-4 sm:grid-cols-3">
         {stats.map((s) => (
           <Link key={s.label} href={s.href} className="card transition hover:shadow-md">
             <p className="text-sm text-muted">{s.label}</p>

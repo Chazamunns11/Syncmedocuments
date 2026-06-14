@@ -11,13 +11,27 @@ type Contact = {
   created_at: string;
 };
 
-export default async function ContactsPage() {
+export default async function ContactsPage({
+  searchParams,
+}: {
+  searchParams: { q?: string };
+}) {
   const supabase = createClient();
-  const { data: contacts } = await supabase
+  // Strip characters that would break the PostgREST `or` filter syntax.
+  const q = (searchParams.q || "").replace(/[,()]/g, " ").trim();
+
+  let query = supabase
     .from("contacts")
     .select("id, first_name, last_name, email, phone, created_at")
     .order("created_at", { ascending: false });
 
+  if (q) {
+    query = query.or(
+      `first_name.ilike.%${q}%,last_name.ilike.%${q}%,email.ilike.%${q}%`,
+    );
+  }
+
+  const { data: contacts } = await query;
   const list = (contacts as Contact[]) || [];
 
   return (
@@ -43,12 +57,24 @@ export default async function ContactsPage() {
         </div>
       </form>
 
+      {/* Search */}
+      <form method="get" className="mt-6">
+        <input
+          name="q"
+          defaultValue={q}
+          className="input"
+          placeholder="Search contacts by name or email…"
+        />
+      </form>
+
       {/* List */}
-      <div className="card mt-6 p-0">
+      <div className="card mt-4 p-0">
         {list.length === 0 ? (
           <div className="p-10 text-center">
-            <p className="text-deep-green">No contacts yet.</p>
-            <p className="mt-1 text-sm text-muted">Add your first one above — it takes five seconds.</p>
+            <p className="text-deep-green">{q ? `No matches for “${q}”.` : "No contacts yet."}</p>
+            <p className="mt-1 text-sm text-muted">
+              {q ? "Try a different search." : "Add your first one above — it takes five seconds."}
+            </p>
           </div>
         ) : (
           <ul className="divide-y divide-deep-green/10">
