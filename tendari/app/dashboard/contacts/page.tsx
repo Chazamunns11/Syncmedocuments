@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
+import { contactName, contactInitial } from "@/lib/contact";
 import { addContact, deleteContact } from "./actions";
 
 type Contact = {
@@ -17,8 +18,9 @@ export default async function ContactsPage({
   searchParams: { q?: string };
 }) {
   const supabase = createClient();
-  // Strip characters that would break the PostgREST `or` filter syntax.
-  const q = (searchParams.q || "").replace(/[,()]/g, " ").trim();
+  // Strip characters that break the PostgREST `or` filter syntax (, ( ))
+  // and LIKE wildcards (% _ *) so search stays literal.
+  const q = (searchParams.q || "").replace(/[,()%_*]/g, " ").trim();
 
   let query = supabase
     .from("contacts")
@@ -79,12 +81,12 @@ export default async function ContactsPage({
         ) : (
           <ul className="divide-y divide-deep-green/10">
             {list.map((c) => {
-              const name = [c.first_name, c.last_name].filter(Boolean).join(" ") || "—";
+              const name = contactName(c, "—");
               return (
                 <li key={c.id} className="flex items-center justify-between px-5 py-3.5">
                   <Link href={`/dashboard/contacts/${c.id}`} className="flex flex-1 items-center gap-3">
                     <span className="flex h-9 w-9 items-center justify-center rounded-full bg-mint text-sm font-semibold text-deep-green">
-                      {(c.first_name?.[0] || c.email?.[0] || "?").toUpperCase()}
+                      {contactInitial(c)}
                     </span>
                     <div>
                       <p className="text-sm font-medium text-ink hover:text-forest">{name}</p>

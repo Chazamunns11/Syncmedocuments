@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { getAccount } from "@/lib/account";
+import { verifyContactId } from "@/lib/contact";
 
 export async function addContact(formData: FormData) {
   const account = await getAccount();
@@ -57,11 +58,14 @@ export async function updateContact(formData: FormData) {
 export async function addNote(formData: FormData) {
   const account = await getAccount();
   if (!account) return;
-  const contact_id = String(formData.get("contact_id") || "");
+  const rawContactId = String(formData.get("contact_id") || "");
   const body = String(formData.get("body") || "").trim();
-  if (!contact_id || !body) return;
+  if (!rawContactId || !body) return;
 
   const supabase = createClient();
+  const contact_id = await verifyContactId(supabase, rawContactId);
+  if (!contact_id) return;
+
   await supabase.from("activities").insert({
     account_id: account.accountId,
     contact_id,

@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { getAccount } from "@/lib/account";
+import { verifyContactId } from "@/lib/contact";
 
 export async function createDeal(formData: FormData) {
   const account = await getAccount();
@@ -10,7 +11,6 @@ export async function createDeal(formData: FormData) {
 
   const title = String(formData.get("title") || "").trim();
   const stage_id = String(formData.get("stage_id") || "");
-  const contact_id = String(formData.get("contact_id") || "") || null;
   if (!title || !stage_id) return;
 
   const supabase = createClient();
@@ -20,6 +20,8 @@ export async function createDeal(formData: FormData) {
     .eq("id", stage_id)
     .single();
   if (!stage) return;
+
+  const contact_id = await verifyContactId(supabase, String(formData.get("contact_id") || "") || null);
 
   await supabase.from("deals").insert({
     account_id: account.accountId,
@@ -32,16 +34,20 @@ export async function createDeal(formData: FormData) {
   revalidatePath("/dashboard/pipeline");
 }
 
-export async function moveDeal(formData: FormData) {
-  const id = String(formData.get("id") || "");
-  const stage_id = String(formData.get("stage_id") || "");
-  await moveDealById(id, stage_id);
-}
-
-/** Typed variant for the drag-and-drop board (called from a Client Component). */
+/** Move a deal to another stage. Called from the drag-and-drop board (Client Component). */
 export async function moveDealById(id: string, stage_id: string) {
   if (!id || !stage_id) return;
   const supabase = createClient();
+
+  // Verify the target stage is in the caller's account (RLS-scoped select):
+  // prevents pointing a deal at another tenant's stage.
+  const { data: stage } = await supabase
+    .from("stages")
+    .select("id")
+    .eq("id", stage_id)
+    .single();
+  if (!stage) return;
+
   await supabase
     .from("deals")
     .update({ stage_id, updated_at: new Date().toISOString() })

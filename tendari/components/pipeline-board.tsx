@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { moveDealById } from "@/app/dashboard/pipeline/actions";
 
 type Stage = { id: string; name: string };
@@ -17,6 +17,12 @@ export function PipelineBoard({
   const [dragId, setDragId] = useState<string | null>(null);
   const [overStage, setOverStage] = useState<string | null>(null);
   const [, startTransition] = useTransition();
+
+  // Reconcile with server truth after every revalidation: a successful move
+  // matches the optimistic state; a rejected move reverts the card.
+  useEffect(() => {
+    setDeals(initialDeals);
+  }, [initialDeals]);
 
   function onDrop(stageId: string) {
     setOverStage(null);

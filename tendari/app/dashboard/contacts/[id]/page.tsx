@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { contactName, contactInitial } from "@/lib/contact";
 import { updateContact, addNote, deleteContact } from "../actions";
 import { createDeal } from "../../pipeline/actions";
 import { addTask, toggleTask } from "../../tasks/actions";
@@ -50,7 +51,7 @@ export default async function ContactDetailPage({ params }: { params: { id: stri
   const stageName = (id: string) => stages.find((s) => s.id === id)?.name ?? "";
   const firstStage = stages[0]?.id ?? "";
 
-  const name = [contact.first_name, contact.last_name].filter(Boolean).join(" ") || "Unnamed contact";
+  const name = contactName(contact);
 
   return (
     <div>
@@ -58,7 +59,7 @@ export default async function ContactDetailPage({ params }: { params: { id: stri
 
       <div className="mt-3 flex items-center gap-3">
         <span className="flex h-12 w-12 items-center justify-center rounded-full bg-mint text-lg font-semibold text-deep-green">
-          {(contact.first_name?.[0] || contact.email?.[0] || "?").toUpperCase()}
+          {contactInitial(contact)}
         </span>
         <div>
           <h1 className="text-2xl font-semibold text-deep-green">{name}</h1>

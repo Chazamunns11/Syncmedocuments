@@ -30,7 +30,10 @@ function LoginForm() {
     const { error } = await supabase.auth.signInWithPassword({ email, password });
     setLoading(false);
     if (error) return setError(error.message);
-    router.push(params.get("redirect") || "/dashboard");
+    // Only allow same-origin relative redirects (block //evil.com, http://…).
+    const wanted = params.get("redirect") || "";
+    const dest = wanted.startsWith("/") && !wanted.startsWith("//") ? wanted : "/dashboard";
+    router.push(dest);
     router.refresh();
   }
 
