@@ -1,6 +1,6 @@
-# Tend — Automation Engine Spec
+# Tendril — Automation Engine Spec
 
-The automation engine is the **moat** — it's what makes Tend "GHL-style" rather than a contact list.
+The automation engine is the **moat** — it's what makes Tendril "GHL-style" rather than a contact list.
 This document specifies triggers, actions, the runner, and reliability rules.
 
 ---

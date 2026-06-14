@@ -1,4 +1,7 @@
-# Tend — Brand Naming Research & Shortlist
+# Tendril — Brand Naming Research & Shortlist
+
+> **Decision: the name is Tendril** (chosen from the shortlist below), pending the live
+> domain/trademark verification in §6. Backups: Grove, Lodestar.
 
 Synthesis of multi-source deep research (2025–2026) on naming a coach-first CRM.
 **Critical caveat:** live domain availability and trademark status **cannot** be verified by
@@ -28,7 +31,7 @@ Several competitor/registrar figures came from secondary sources (vendor pages b
 
 ## 2. The two camps (and which we want)
 - **Soft/evocative real or coined words** → *premium, simple, brand-forward* positioning.
-  HoneyBook, Bonsai, Satori, Dubsado, Kajabi, Notion, Stripe. **← This is Tend's lane.**
+  HoneyBook, Bonsai, Satori, Dubsado, Kajabi, Notion, Stripe. **← This is Tendril's lane.**
 - **Descriptive compounds** → *feature-stuffed, does-everything* positioning.
   CoachAccountable, GoHighLevel, ClickFunnels, ActiveCampaign. (The bloat brands we're positioned against.)
 
@@ -40,7 +43,7 @@ From the research, these have high collision or saturation risk in/near our spac
 **Ally** (bank), **Mentor** (Siemens), **Unity** (game engine).
 Also avoid saturated affixes: `-ly`, `-ify`, `-hub`, `-flow`, `-ai`, `Smart-`.
 
-## 4. On the current working name "Tend"
+## 4. Why "Tendril" over plain "Tend"
 - **Pro:** semantically perfect ("runs your follow-ups for you" = tending your client garden), short,
   warm, 1 syllable, passes the radio test.
 - **Con:** there is a **well-known dental/wellness brand "Tend"** (owns `tend.com`). Different class
@@ -86,11 +89,11 @@ Run this on your top 2–3 (you're UK-based — check **both** UK and US):
 7. **Radio test:** say it to 5 people; can they spell it back?
 8. **File intent-to-use** once decided — secures priority before launch.
 
-## 7. Recommendation
-Lead candidate: **Tendril** (keeps the warm "tend" root you already like, adds the
-"reaching out to follow up" metaphor, is far more ownable than "Tend"). Backups: **Grove**, **Lodestar**.
-Keep **"Tend"** only if `tend.coach`/`gettend.com` is acceptable and the dental-brand search comes back
-clean in Class 42.
+## 7. Decision
+**Chosen: Tendril** — keeps the warm "tend" root, adds the "reaching out to follow up" metaphor, and is
+far more ownable than plain "Tend" (whose `.com` is held by a dental brand). Backups if the §6 checks
+block it: **Grove**, then **Lodestar**.
 
-> Note: the planning docs currently use **"Tend"** as a placeholder. Once a name is locked (after the
-> §6 checks), it gets propagated across all docs.
+> Status: **all planning docs now use "Tendril".** Final sign-off is contingent on the §6
+> domain + UK/US trademark checks coming back clean (Class 42); if not, fall back to Grove/Lodestar
+> and re-propagate.

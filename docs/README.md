@@ -1,10 +1,11 @@
-# Tend — Coach-first CRM (planning & specs)
+# Tendril — Coach-first CRM (planning & specs)
 
-Planning docs for **Tend**, a simple, flat-priced GoHighLevel/Practice.do alternative built
-specifically for solo online coaches. *(Name is provisional — see business plan.)*
+Planning docs for **Tendril**, a simple, flat-priced GoHighLevel/Practice.do alternative built
+specifically for solo online coaches. *(Name chosen — pending the domain/trademark check in
+`branding.md`; backups Grove, Lodestar.)*
 
 > Note: this lives in the `Syncmedocuments` repo alongside an unrelated value-betting bot.
-> These are planning/spec documents only — no Tend application code has been written yet.
+> These are planning/spec documents only — no Tendril application code has been written yet.
 
 ## Documents
 - **[business-plan.md](business-plan.md)** — name, problem, ICP, positioning, GTM, financials, risks.

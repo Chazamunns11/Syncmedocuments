@@ -1,6 +1,6 @@
-# Tend — Unit Economics
+# Tendril — Unit Economics
 
-What it costs to run Tend and the profit per customer. Built from cost figures verified in the
+What it costs to run Tendril and the profit per customer. Built from cost figures verified in the
 2025–2026 deep research (see `pricing.md`). **Estimates** — re-measure against real usage in beta.
 
 > Scope: these are **operating COGS and gross margin**. They exclude the founder's time/salary,
