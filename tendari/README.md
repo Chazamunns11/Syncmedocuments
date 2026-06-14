@@ -7,10 +7,14 @@ This is the **Phase 0–1 MVP** (functional, offline-capable on just Supabase):
 - Auth + multi-tenant data with Row-Level Security; account auto-provisioned on signup.
 - **Contacts**: search, tag filter, inline add, CSV import, detail page (edit, notes timeline,
   tags, that contact's deals + follow-ups).
-- **Pipeline**: drag-and-drop board, deal values, per-stage + total sums, won/lost.
+- **Pipeline**: drag-and-drop board, deal values, per-stage + total sums, won/lost, closed history.
+- **Booking**: weekly availability + meeting types, public self-booking page `/b/<token>` with
+  timezone-aware slot computation (`lib/slots.ts`); bookings create a contact + timeline entry.
+- **Lead forms**: public `/f/<token>` capture pages; submissions become contacts (SECURITY DEFINER).
 - **Follow-ups (tasks)**: due dates, overdue (in the account timezone), complete/delete.
 - **Settings**: business name + timezone.
-- **Onboarding**: first-run guided walkthrough, interactive getting-started checklist, "How to use" guide.
+- **Dashboard**: revenue tiles (pipeline value, won this month) + getting-started checklist.
+- **Onboarding**: first-run guided walkthrough, "How to use" guide, custom 404/loading states.
 
 See `../docs/` for the full plan, specs, pricing and brand identity.
 
@@ -26,9 +30,10 @@ npm run dev                         # http://localhost:3000
 ### 1. Create a Supabase project
 - Grab `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY` from Project Settings → API.
 - Run the migrations **in order** in the Supabase SQL editor (or via CLI / MCP):
-  `0001_init.sql` → `0002_tasks.sql` → `0003_account_timezone.sql` → `0004_tags.sql`.
+  `0001_init` → `0002_tasks` → `0003_account_timezone` → `0004_tags` → `0005_forms` → `0006_booking`.
   `0001` creates the core tables, RLS policies, and a trigger that provisions an account +
-  default pipeline whenever a user signs up.
+  default pipeline whenever a user signs up. `0005`/`0006` add SECURITY DEFINER functions
+  (granted to `anon`) so public forms/booking work without exposing tenant data.
 - For local dev, turn **off** "Confirm email" (Auth → Providers → Email) so signup logs you straight in.
 
 ### 2. Run it
