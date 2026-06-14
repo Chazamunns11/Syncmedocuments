@@ -1,6 +1,6 @@
-# Tendril — Automation Engine Spec
+# Tendari — Automation Engine Spec
 
-The automation engine is the **moat** — it's what makes Tendril "GHL-style" rather than a contact list.
+The automation engine is the **moat** — it's what makes Tendari "GHL-style" rather than a contact list.
 This document specifies triggers, actions, the runner, and reliability rules.
 
 ---

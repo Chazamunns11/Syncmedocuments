@@ -1,4 +1,4 @@
-# Tendril — Pricing Strategy & Research
+# Tendari — Pricing Strategy & Research
 
 *Synthesis of deep research (2025–2026). Method caveat: many vendor pages 403'd to automated
 fetch, so a number of figures come from search-result extracts / secondary sources. Hard tier
@@ -37,7 +37,7 @@ Full cost-to-run and profit-per-customer breakdown: **`unit-economics.md`** (Pro
 ---
 
 ## Anti-"bill-shock" model (core differentiator vs GoHighLevel)
-GHL's metered SMS/email is the #1 source of bill-shock complaints. Tendril's rule: **bundle generous
+GHL's metered SMS/email is the #1 source of bill-shock complaints. Tendari's rule: **bundle generous
 allowances, pass overage through at/near cost, ship hard spend caps + a live usage meter.**
 
 - **Included in each tier:** a generous email allowance + (Pro+) an SMS/AI credit pool.
@@ -79,7 +79,7 @@ where possible. Don't hardcode token economics — Haiku's price has moved.
 | ActiveCampaign | $15–79 @1k contacts | Email/automation, **scales with list size** |
 | **Practice.do** | — | **Shut down Nov 2025** (migration opportunity) |
 
-**Gap Tendril fills:** coach-native CRM + booking + payments + contracts **with** a real automation
+**Gap Tendari fills:** coach-native CRM + booking + payments + contracts **with** a real automation
 engine + SMS + integrations, at **flat, non-metered, non-contact-capped** pricing.
 
 ---

@@ -1,6 +1,6 @@
-# Tendril — Technical Specification
+# Tendari — Technical Specification
 
-Master spec for the Tendril coach-first CRM. Companion docs:
+Master spec for the Tendari coach-first CRM. Companion docs:
 `data-model.md`, `automation-engine.md`, `mvp-roadmap.md`.
 
 ---
@@ -100,10 +100,10 @@ Cloudflare Durable Object Alarms / a Render worker (alternatives).
 
 ### 3.5 Payments / invoicing (Stripe, no surcharge)
 - Coach connects **their own Stripe** (Stripe Connect Standard, or their API keys). Money flows
-  coach→client directly; **Tendril takes no payment surcharge** (key differentiator vs Kajabi).
+  coach→client directly; **Tendari takes no payment surcharge** (key differentiator vs Kajabi).
 - Features: one-off invoices, payment links, package/subscription products, checkout embedded in
   booking flow. Webhook from Stripe → log payment to contact timeline, emit `payment_succeeded` trigger.
-- Separately, Stripe Billing handles **Tendril's own subscription** (Solo/Pro/Studio) + metered overage.
+- Separately, Stripe Billing handles **Tendari's own subscription** (Solo/Pro/Studio) + metered overage.
 
 ### 3.6 Forms & contracts
 - Form builder (fields → JSONB schema). Public form pages; submission → contact + `form_submission`

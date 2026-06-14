@@ -1,4 +1,4 @@
-# Tendril — Data Model
+# Tendari — Data Model
 
 Postgres (Supabase). Every tenant table carries `account_id` and is protected by **Row-Level Security**.
 Types are indicative; timestamps are `timestamptz`; ids are `uuid` (default `gen_random_uuid()`).

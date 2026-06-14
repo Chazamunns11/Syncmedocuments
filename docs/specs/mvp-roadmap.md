@@ -1,4 +1,4 @@
-# Tendril — MVP Build Roadmap
+# Tendari — MVP Build Roadmap
 
 Sequenced so each phase ships something demoable and de-risks the hard parts early.
 Built and maintained with Claude Code. Target: solo founder + AI, lean managed services.
@@ -40,10 +40,10 @@ Built and maintained with Claude Code. Target: solo founder + AI, lean managed s
 - [ ] Stripe webhooks → `payment_succeeded`/`invoice_paid` triggers + timeline.
 - [ ] Form builder + public forms → `form_submitted`.
 - [ ] Contract templates + e-signature + signed PDF storage → `contract_signed`.
-**Exit:** coach can get paid and onboard a client without leaving Tendril.
+**Exit:** coach can get paid and onboard a client without leaving Tendari.
 
 ## Phase 5 — Billing, metering, launch-ready (week 6–7)
-- [ ] Stripe Billing for **Tendril's own** subscription (Solo/Pro/Studio) + trial + founder coupon.
+- [ ] Stripe Billing for **Tendari's own** subscription (Solo/Pro/Studio) + trial + founder coupon.
 - [ ] `usage_ledger` + spend caps + usage dashboard (anti-bill-shock).
 - [ ] Inbound webhook bus `/hooks/*`; outbound webhook action hardened.
 - [ ] Settings/integrations UI; data export/delete (GDPR).

@@ -1,11 +1,11 @@
-# Tendril — Coach-first CRM (planning & specs)
+# Tendari — Coach-first CRM (planning & specs)
 
-Planning docs for **Tendril**, a simple, flat-priced GoHighLevel/Practice.do alternative built
+Planning docs for **Tendari**, a simple, flat-priced GoHighLevel/Practice.do alternative built
 specifically for solo online coaches. *(Name chosen — pending the domain/trademark check in
-`branding.md`; backups Grove, Lodestar.)*
+`branding.md`; backups Followell, Nurri.)*
 
 > Note: this lives in the `Syncmedocuments` repo alongside an unrelated value-betting bot.
-> These are planning/spec documents only — no Tendril application code has been written yet.
+> These are planning/spec documents only — no Tendari application code has been written yet.
 
 ## Documents
 - **[business-plan.md](business-plan.md)** — name, problem, ICP, positioning, GTM, financials, risks.
@@ -13,8 +13,8 @@ specifically for solo online coaches. *(Name chosen — pending the domain/trade
   unit costs, competitive landscape.
 - **[unit-economics.md](unit-economics.md)** — cost to run, profit per customer (~$59/Pro/mo, ~85% margin),
   fixed costs by stage, MRR milestones.
-- **[branding.md](branding.md)** — naming research, name shortlist (lead candidate **Tendril**;
-  backups Grove, Lodestar), and a finalize-the-name checklist (domain + UK/US trademark).
+- **[branding.md](branding.md)** — naming research, the chosen name **Tendari** (real-word candidates
+  were taken; backups Followell, Nurri), and a finalize-the-name checklist (domain + UK/US trademark).
 - **specs/**
   - **[technical-spec.md](specs/technical-spec.md)** — architecture, stack, modules, security, NFRs.
   - **[data-model.md](specs/data-model.md)** — Postgres schema (Supabase + RLS).

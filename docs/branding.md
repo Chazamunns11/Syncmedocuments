@@ -1,7 +1,11 @@
-# Tendril — Brand Naming Research & Shortlist
+# Tendari — Brand Naming Research & Shortlist
 
-> **Decision: the name is Tendril** (chosen from the shortlist below), pending the live
-> domain/trademark verification in §6. Backups: Grove, Lodestar.
+> **Decision: the name is Tendari** — a coined/brandable name (from *tend*), chosen because a
+> second-round collision check found that nearly every distinctive **real-word** candidate is already
+> taken by a funded SaaS/CRM (Trellis, Lodestar→StarterCRM, Sprig, Hearth→a contractor CRM, Kindred,
+> Almanac), and the earlier pick **Tendril** was killed by `tendril.studio`. Coined names (Kajabi,
+> Dubsado precedent) are far more ownable. Backups: **Followell**, **Nurri**.
+> Pending the live domain/trademark verification in §6.
 
 Synthesis of multi-source deep research (2025–2026) on naming a coach-first CRM.
 **Critical caveat:** live domain availability and trademark status **cannot** be verified by
@@ -31,7 +35,7 @@ Several competitor/registrar figures came from secondary sources (vendor pages b
 
 ## 2. The two camps (and which we want)
 - **Soft/evocative real or coined words** → *premium, simple, brand-forward* positioning.
-  HoneyBook, Bonsai, Satori, Dubsado, Kajabi, Notion, Stripe. **← This is Tendril's lane.**
+  HoneyBook, Bonsai, Satori, Dubsado, Kajabi, Notion, Stripe. **← This is Tendari's lane.**
 - **Descriptive compounds** → *feature-stuffed, does-everything* positioning.
   CoachAccountable, GoHighLevel, ClickFunnels, ActiveCampaign. (The bloat brands we're positioned against.)
 
@@ -54,10 +58,17 @@ Also avoid saturated affixes: `-ly`, `-ify`, `-hub`, `-flow`, `-ai`, `Smart-`.
 ## 5. Recommended shortlist
 Honest collision flags included. **All need live verification (§6).**
 
+> **Second-round outcome (after a dedicated collision check):** `tendril.studio` is taken (Tendril
+> rejected), and most Tier 1–2 **real-word** names turned out to be taken by funded SaaS/CRM companies —
+> Trellis, **Lodestar** (runs StarterCRM), **Sprig**, **Hearth** (a contractor CRM), **Kindred**,
+> **Almanac**, and **Grove**/`grove.com`. **Roster**'s `.com` is an unaffordable dictionary domain.
+> → We moved to the **coined** tier; **Tendari** tested cleanest (LOW collision). New coined backups:
+> **Followell** ("follow" + "well") and **Nurri** (from "nurture"). Real-word maybes: Cairn, Cadenza (both MEDIUM).
+
 ### Tier 1 — strongest (distinctive, on-theme, likely ownable)
 | Name | Why it works | Flags |
 |---|---|---|
-| **Tendril** ⭐ | Evocative of *both* tending/growth **and** reaching out (a vine's tendril extends to connect) — a near-perfect metaphor for automated follow-ups. Distinctive, brandable, 2 syllables, premium. | Slightly botanical; verify `.com` + Class 42 mark. |
+| ~~**Tendril**~~ *(rejected)* | Evocative of *both* tending/growth **and** reaching out (a vine's tendril extends to connect). | **`tendril.studio` taken** — rejected in round 2. |
 | **Grove** | Calm, premium, "a place where things grow"; under-used in SaaS vs Bloom/Sprout. | `grove.com` likely taken (a few small Groves); check class. |
 | **Lodestar** | "Guiding star" — coaching-perfect, premium, distinctive, memorable. | 3 syllables; verify domain/mark. |
 
@@ -90,10 +101,15 @@ Run this on your top 2–3 (you're UK-based — check **both** UK and US):
 8. **File intent-to-use** once decided — secures priority before launch.
 
 ## 7. Decision
-**Chosen: Tendril** — keeps the warm "tend" root, adds the "reaching out to follow up" metaphor, and is
-far more ownable than plain "Tend" (whose `.com` is held by a dental brand). Backups if the §6 checks
-block it: **Grove**, then **Lodestar**.
+**Chosen: Tendari** — coined from *tend* (tending your client garden / your follow-ups, tended for you).
+Picked because the distinctive real-word options are taken by funded SaaS/CRM brands and the coined route
+(Kajabi/Dubsado precedent) is genuinely ownable; it tested LOW for collisions. Backups if the §6 checks
+block it: **Followell**, then **Nurri**.
 
-> Status: **all planning docs now use "Tendril".** Final sign-off is contingent on the §6
-> domain + UK/US trademark checks coming back clean (Class 42); if not, fall back to Grove/Lodestar
+> Earlier picks, for the record: **Tend** (rejected — dental brand owns `tend.com`), **Tendril**
+> (rejected — `tendril.studio` taken). Real-word shortlist (Grove/Lodestar/etc.) rejected on the
+> second-round collision check.
+
+> Status: **all planning docs now use "Tendari".** Final sign-off is contingent on the §6
+> domain + UK/US trademark checks coming back clean (Class 42); if not, fall back to Followell/Nurri
 > and re-propagate.

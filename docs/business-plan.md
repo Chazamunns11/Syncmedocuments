@@ -1,8 +1,9 @@
-# Tendril — Business Plan
+# Tendari — Business Plan
 
-> **Name: Tendril** — "the coach-first CRM that runs your follow-ups for you."
-> (A tendril both *grows* and *reaches out to connect* — the metaphor for automated follow-ups.)
-> Backups if domain/trademark blocks it: **Grove**, **Lodestar** (see `docs/branding.md`).
+> **Name: Tendari** — "the coach-first CRM that runs your follow-ups for you."
+> (Coined from *tend* — tending your client garden / your follow-ups, tended for you. A brandable,
+> ownable name in the Kajabi/Dubsado mould, chosen because real-word names in this space are taken.)
+> Backups if domain/trademark blocks it: **Followell**, **Nurri** (see `docs/branding.md`).
 > *(Domain + UK/US trademark availability NOT yet verified — run the `branding.md` checklist before
 > committing to branding.)*
 
@@ -37,7 +38,7 @@ Market reality (2025 ICF study): coaches average ~$72k/yr; bottom 10% under $30k
 is real**, spend clusters **under $100/mo**, hard balk at the **$100–150** line.
 
 ## 4. Positioning & differentiation
-| vs. | Their weakness | Tendril's edge |
+| vs. | Their weakness | Tendari's edge |
 |---|---|---|
 | GoHighLevel | Agency bloat, usage bill-shock, learning curve, weak deliverability | Coach-first, flat pricing w/ included allowances + spend caps, setup in a day, deliverability-first email |
 | Kajabi | $149 entry, course-first, Stripe surcharge, light CRM | $29 entry, CRM-first, **no payment surcharge / no lock-in** |
@@ -66,7 +67,7 @@ follow-ups, summarizes calls, and proposes next actions — human-approved, neve
    "Kajabi too expensive"), automation templates, deliverability guides.
 4. **Partnerships:** coach-certification bodies, coach-school communities, affiliate program (coaches
    refer coaches — flat referral, not a white-label reseller scheme).
-5. **Product-led:** booking page is a public, branded acquisition surface ("Powered by Tendril").
+5. **Product-led:** booking page is a public, branded acquisition surface ("Powered by Tendari").
 
 ## 7. Financial model (illustrative — full detail in `docs/unit-economics.md`)
 - **Infra baseline:** ~$0 at MVP (free tiers) → ~$300/mo even at $10k MRR (Supabase + hosting + email).
