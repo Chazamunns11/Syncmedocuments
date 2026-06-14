@@ -26,13 +26,19 @@ const steps: Step[] = [
   {
     badge: "Step 2",
     title: "Track everyone in your Pipeline",
-    body: "The Pipeline is a simple board: Lead → Discovery → Active → Renewal. Move a client along with one dropdown so you always know who needs your attention next.",
+    body: "The Pipeline is a simple board: Lead → Discovery → Proposal → Active → Renewal → Past. Drag a client between columns, set a deal value, and mark deals won or lost.",
     cta: { label: "Open Pipeline", href: "/dashboard/pipeline" },
   },
   {
+    badge: "Step 3",
+    title: "Get booked & capture leads",
+    body: "Set your availability and share your booking link so clients book themselves in. Add a lead form and every submission becomes a contact automatically.",
+    cta: { label: "Set up Booking", href: "/dashboard/booking" },
+  },
+  {
     badge: "Coming next",
-    title: "Booking, payments & auto follow-ups",
-    body: "Soon you'll connect your calendar, take payment through your own Stripe (no surcharge), and set up “wait 3 days, then email” automations. We'll guide you through each one when it lands.",
+    title: "Payments & automatic follow-ups",
+    body: "Soon you'll take payment through your own Stripe (no surcharge) and set up “wait 3 days, then email” automations. We'll guide you through each one when it lands.",
   },
   {
     badge: "You're set",

@@ -5,21 +5,28 @@ import { ReplayTourButton } from "@/components/onboarding-tour";
 const sections = [
   {
     title: "1. Add your contacts",
-    body: "Contacts are the heart of Tendari — every client and lead you work with. Go to Contacts, fill the one-line form (a first name is enough), and they're in. No modals, no required fields you don't have yet.",
+    body: "Contacts are the heart of Tendari — every client and lead. Add them one at a time (a first name is enough), import a CSV from your old tool, or let them come in through a lead form. Organise with tags and search any time.",
     link: { href: "/dashboard/contacts", label: "Open Contacts" },
   },
   {
     title: "2. Work your pipeline",
-    body: "The Pipeline shows where everyone stands: Lead → Discovery → Proposal → Active → Renewal → Past. Add a deal, then move it along with a single dropdown. A glance tells you who needs you next.",
+    body: "The Pipeline shows where everyone stands: Lead → Discovery → Proposal → Active → Renewal → Past. Drag a card between columns, set a deal value, and mark deals Won or Lost. The header totals your open pipeline.",
     link: { href: "/dashboard/pipeline", label: "Open Pipeline" },
   },
   {
-    title: "3. Let follow-ups run themselves (coming soon)",
-    body: "Soon you'll build simple automations — “when a lead is added, wait 2 days, then send this email”. You set it once; Tendari does the chasing so nothing slips.",
+    title: "3. Get booked",
+    body: "Set your weekly availability and create a meeting type, then share your /b/ link. Clients pick a slot themselves and instantly become a contact with a booking on their timeline.",
+    link: { href: "/dashboard/booking", label: "Set up Booking" },
   },
   {
-    title: "4. Get booked & paid (coming soon)",
-    body: "Connect your calendar for a branded booking page with reminders, and take payment through your own Stripe — with no surcharge from us, ever.",
+    title: "4. Capture leads",
+    body: "Create a lead form and share its link. Every submission lands as a contact automatically — no copy-paste, no missed enquiries.",
+    link: { href: "/dashboard/forms", label: "Create a form" },
+  },
+  {
+    title: "5. Stay on top with follow-ups",
+    body: "Add follow-ups with due dates so nothing slips. Automated follow-up sequences (and payments) are on the way — your manual list becomes automatic.",
+    link: { href: "/dashboard/tasks", label: "Open Follow-ups" },
   },
 ];
 
