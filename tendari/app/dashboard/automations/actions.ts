@@ -22,6 +22,24 @@ export async function addWorkflowFromTemplate(formData: FormData) {
   revalidatePath("/dashboard/automations");
 }
 
+export async function addWebhookWorkflow(formData: FormData) {
+  const account = await getAccount();
+  if (!account) return;
+  const trigger = String(formData.get("trigger_type") || "");
+  const url = String(formData.get("url") || "").trim();
+  const allowed = ["contact_created", "booking_created", "tag_added"];
+  if (!allowed.includes(trigger) || !/^https?:\/\//i.test(url)) return;
+
+  const supabase = createClient();
+  await supabase.from("workflows").insert({
+    account_id: account.accountId,
+    name: "Send to webhook",
+    trigger_type: trigger,
+    steps: [{ type: "webhook", url }],
+  });
+  revalidatePath("/dashboard/automations");
+}
+
 export async function toggleWorkflow(formData: FormData) {
   const id = String(formData.get("id") || "");
   if (!id) return;

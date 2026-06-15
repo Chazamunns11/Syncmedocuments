@@ -1,6 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { TEMPLATES } from "@/lib/automation-templates";
-import { addWorkflowFromTemplate, toggleWorkflow, deleteWorkflow } from "./actions";
+import { addWorkflowFromTemplate, addWebhookWorkflow, toggleWorkflow, deleteWorkflow } from "./actions";
 
 type Step = Record<string, unknown>;
 type Workflow = { id: string; name: string; trigger_type: string; steps: Step[]; active: boolean };
@@ -18,6 +18,7 @@ function stepSummary(step: Step): string {
     case "add_tag": return `tag “${String(step.name)}”`;
     case "create_task": return `create task “${String(step.title)}”`;
     case "notify": return "notify you";
+    case "webhook": return "send to webhook";
     default: return type;
   }
 }
@@ -53,6 +54,21 @@ export default async function AutomationsPage() {
           ))}
         </div>
       </div>
+
+      {/* Outbound webhook */}
+      <form action={addWebhookWorkflow} className="card mt-4">
+        <p className="label">Connect a webhook (Zapier / Make / n8n)</p>
+        <p className="mb-3 text-xs text-muted">Send an event to any URL when something happens — chain Tendari into your other tools.</p>
+        <div className="grid gap-3 sm:grid-cols-[auto_1fr_auto]">
+          <select name="trigger_type" className="input" defaultValue="contact_created">
+            <option value="contact_created">New contact</option>
+            <option value="booking_created">New booking</option>
+            <option value="tag_added">Tag added</option>
+          </select>
+          <input name="url" className="input" placeholder="https://hooks.zapier.com/..." inputMode="url" />
+          <button className="btn-primary">Connect</button>
+        </div>
+      </form>
 
       {/* Active automations */}
       <div className="mt-8">

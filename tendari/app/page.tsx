@@ -4,50 +4,51 @@ import { Logo, LogoMark } from "@/components/logo";
 const features = [
   {
     title: "Contacts & pipeline",
-    body: "A clean visual board of every client — Lead → Discovery → Active → Renewal. See where everyone stands at a glance.",
+    body: "A clean visual board of every client — Lead → Discovery → Active → Renewal. Import, tag, search, and drag deals across stages.",
   },
   {
-    title: "Booking that syncs",
-    body: "A branded booking page wired to your calendar, with automatic reminders so no-shows stop costing you money.",
+    title: "Self-serve booking",
+    body: "Share a branded booking link; clients pick a slot and instantly become a contact with the call on their timeline.",
   },
   {
-    title: "Payments, no surcharge",
-    body: "Get paid through your own Stripe. We never take a cut of your client payments — unlike the course platforms.",
+    title: "Lead forms & contracts",
+    body: "Public lead-capture forms and e-signed agreements that drop straight onto the client's timeline.",
   },
   {
-    title: "Follow-ups on autopilot",
-    body: "“Wait 3 days, then email.” Build simple automations that nurture leads and onboard clients while you coach.",
+    title: "Automations",
+    body: "When a lead, booking or tag lands: wait, tag, create a follow-up task, notify you, or fire a webhook to your other tools.",
   },
   {
-    title: "Forms & contracts",
-    body: "Intake forms and e-signed agreements that drop straight onto the client's timeline.",
+    title: "Integrations",
+    body: "Inbound webhooks turn any tool into a lead source; outbound webhooks chain Tendari into Zapier, Make or n8n.",
   },
   {
-    title: "No bill shock",
-    body: "Generous email/SMS allowances, at-cost overage, and hard spend caps. Always know what you'll pay.",
+    title: "Honest & simple",
+    body: "Flat pricing, no per-seat games, and your data stays yours. Built for one busy coach, not an agency.",
   },
 ];
 
+// Tier feature lists. "soon" items are on the roadmap (see footnote).
 const tiers = [
   {
     name: "Solo",
     price: "$29",
     tagline: "New & bootstrapped coaches",
-    points: ["CRM + pipeline", "Booking & reminders", "Payments (no surcharge)", "Email automation", "1,000 contacts"],
+    points: ["CRM + pipeline", "Booking page", "Lead forms & contracts", "Automations (tag / task / notify)", "Up to 1,000 contacts"],
     featured: false,
   },
   {
     name: "Pro",
     price: "$69",
     tagline: "Working coaches",
-    points: ["Everything in Solo", "SMS + full automations", "Unlimited contacts", "More email + AI credits", "Webhooks & integrations"],
+    points: ["Everything in Solo", "Unlimited contacts", "Webhooks & integrations", "Email automations · soon", "Payments, no surcharge · soon"],
     featured: true,
   },
   {
     name: "Studio",
     price: "$149",
     tagline: "Coaches with a team",
-    points: ["Everything in Pro", "Up to 5 seats", "White-label booking page", "API access", "Priority support"],
+    points: ["Everything in Pro", "Team seats · soon", "White-label booking · soon", "Priority support"],
     featured: false,
   },
 ];
@@ -76,8 +77,8 @@ export default function LandingPage() {
             The coach-first CRM that runs your follow-ups for you.
           </h1>
           <p className="mx-auto mt-5 max-w-2xl text-lg text-muted">
-            Pipeline, booking, payments, contracts and automated follow-ups — in one simple tool.
-            All the power of GoHighLevel, none of the bloat, surprise bills, or month-long setup.
+            Pipeline, booking, forms, contracts and automated follow-ups — in one simple tool.
+            All the essentials, none of the bloat or month-long setup.
           </p>
           <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
             <Link href="/signup" className="btn-primary w-full sm:w-auto">Start your 14-day trial</Link>
@@ -144,7 +145,7 @@ export default function LandingPage() {
       <section id="pricing" className="bg-white">
         <div className="mx-auto max-w-6xl px-6 py-16">
           <h2 className="text-center text-2xl font-semibold text-deep-green sm:text-3xl">Simple, flat pricing</h2>
-          <p className="mx-auto mt-3 max-w-xl text-center text-muted">No per-seat games. No usage surprises. 2 months free on annual.</p>
+          <p className="mx-auto mt-3 max-w-xl text-center text-muted">Simple flat pricing. No per-seat games. Free during early access.</p>
           <div className="mt-10 grid gap-6 lg:grid-cols-3">
             {tiers.map((t) => (
               <div
@@ -173,14 +174,18 @@ export default function LandingPage() {
               </div>
             ))}
           </div>
+          <p className="mt-6 text-center text-xs text-muted">
+            Items marked “· soon” are on the roadmap. During the early-access period you can use everything
+            that&apos;s live today free while we add the rest.
+          </p>
         </div>
       </section>
 
       {/* CTA */}
       <section className="mx-auto max-w-5xl px-6 py-20 text-center">
         <h2 className="text-3xl font-semibold text-deep-green">Ready to let your follow-ups run themselves?</h2>
-        <p className="mx-auto mt-4 max-w-xl text-muted">Start free in under five minutes. Bring your clients, keep your Stripe.</p>
-        <Link href="/signup" className="btn-primary mt-8">Start your 14-day trial</Link>
+        <p className="mx-auto mt-4 max-w-xl text-muted">Start free in under five minutes — set up your pipeline, booking link and forms today.</p>
+        <Link href="/signup" className="btn-primary mt-8">Start free</Link>
       </section>
 
       {/* Footer */}

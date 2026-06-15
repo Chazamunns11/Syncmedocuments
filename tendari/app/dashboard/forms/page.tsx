@@ -40,6 +40,9 @@ export default async function FormsPage() {
                       <a href={link} target="_blank" className="text-xs text-forest hover:underline">
                         {base ? link : `/f/${f.token}`}
                       </a>
+                      <p className="mt-0.5 text-xs text-muted">
+                        Webhook (POST JSON): <code>{base ? `${base}/api/hooks/${f.token}` : `/api/hooks/${f.token}`}</code>
+                      </p>
                     </div>
                     <div className="flex items-center gap-3">
                       <span className={`rounded-full px-2 py-0.5 text-xs ${f.active ? "bg-mint text-deep-green" : "bg-deep-green/10 text-muted"}`}>
