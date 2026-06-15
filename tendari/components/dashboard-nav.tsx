@@ -10,6 +10,8 @@ const links = [
   { href: "/dashboard/booking", label: "Booking" },
   { href: "/dashboard/tasks", label: "Follow-ups" },
   { href: "/dashboard/forms", label: "Lead forms" },
+  { href: "/dashboard/automations", label: "Automations" },
+  { href: "/dashboard/notifications", label: "Notifications" },
   { href: "/dashboard/settings", label: "Settings" },
   { href: "/dashboard/guide", label: "How to use" },
 ];

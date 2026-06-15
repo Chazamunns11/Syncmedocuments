@@ -4,6 +4,7 @@ import { Logo } from "@/components/logo";
 import { DashboardNav } from "@/components/dashboard-nav";
 import { OnboardingTour } from "@/components/onboarding-tour";
 import { getAccount } from "@/lib/account";
+import { createClient } from "@/lib/supabase/server";
 
 // The dashboard is always per-user; never statically cache it.
 export const dynamic = "force-dynamic";
@@ -16,6 +17,12 @@ export default async function DashboardLayout({
   const account = await getAccount();
   if (!account) redirect("/login");
 
+  const supabase = createClient();
+  const { count: unread } = await supabase
+    .from("notifications")
+    .select("*", { count: "exact", head: true })
+    .eq("read", false);
+
   return (
     <div className="min-h-screen lg:flex">
       {/* Sidebar */}
@@ -25,6 +32,14 @@ export default async function DashboardLayout({
           <div className="mt-1 hidden text-xs text-muted lg:block">
             {account.businessName || "Your workspace"}
           </div>
+          {unread ? (
+            <Link
+              href="/dashboard/notifications"
+              className="ml-auto inline-flex items-center gap-1 rounded-full bg-forest px-2.5 py-1 text-xs font-semibold text-white lg:ml-0 lg:mt-2"
+            >
+              {unread} new
+            </Link>
+          ) : null}
         </div>
         <div className="hidden px-3 lg:block">
           <DashboardNav />
