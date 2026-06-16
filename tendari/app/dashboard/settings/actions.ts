@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { getAccount } from "@/lib/account";
+import { createAdminClient, hasAdmin } from "@/lib/supabase/admin";
 
 export async function updateAccount(formData: FormData) {
   const account = await getAccount();
@@ -18,4 +19,12 @@ export async function updateAccount(formData: FormData) {
   await supabase.from("accounts").update(patch).eq("id", account.accountId);
   revalidatePath("/dashboard/settings");
   revalidatePath("/dashboard");
+}
+
+export async function disconnectGoogle() {
+  const account = await getAccount();
+  if (!account || !hasAdmin()) return;
+  const admin = createAdminClient();
+  await admin.from("integrations").delete().eq("account_id", account.accountId).eq("provider", "google");
+  revalidatePath("/dashboard/settings");
 }

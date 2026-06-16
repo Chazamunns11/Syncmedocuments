@@ -13,6 +13,18 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=<anon key from Supabase → Settings → API>
 NEXT_PUBLIC_SITE_URL=http://localhost:3000
 ```
 
+## Google Calendar sync (optional)
+Add these env vars (server-only — do NOT prefix with NEXT_PUBLIC):
+```
+SUPABASE_SERVICE_ROLE_KEY=   # Supabase → Settings → API → service_role secret
+GOOGLE_OAUTH_CLIENT_ID=      # Google Cloud → Credentials → OAuth client (Web app)
+GOOGLE_OAUTH_CLIENT_SECRET=
+```
+In Google Cloud, the OAuth client's **Authorized redirect URI** must be
+`<NEXT_PUBLIC_SITE_URL>/api/google/callback`, and the OAuth consent screen needs the
+`.../auth/calendar.events` scope. Coaches then connect from Settings → Integrations;
+new bookings are pushed to their Google Calendar automatically.
+
 ## Run locally
 ```bash
 cd tendari
