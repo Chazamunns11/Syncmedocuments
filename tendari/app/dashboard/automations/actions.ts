@@ -40,6 +40,26 @@ export async function addWebhookWorkflow(formData: FormData) {
   revalidatePath("/dashboard/automations");
 }
 
+export async function addCustomWorkflow(formData: FormData) {
+  const account = await getAccount();
+  if (!account) return;
+  const name = String(formData.get("name") || "").trim();
+  const trigger_type = String(formData.get("trigger_type") || "");
+  if (!name || !["contact_created", "booking_created", "tag_added"].includes(trigger_type)) return;
+
+  let steps: unknown = [];
+  try {
+    steps = JSON.parse(String(formData.get("steps") || "[]"));
+  } catch {
+    steps = [];
+  }
+  if (!Array.isArray(steps) || steps.length === 0) return;
+
+  const supabase = createClient();
+  await supabase.from("workflows").insert({ account_id: account.accountId, name, trigger_type, steps });
+  revalidatePath("/dashboard/automations");
+}
+
 export async function toggleWorkflow(formData: FormData) {
   const id = String(formData.get("id") || "");
   if (!id) return;

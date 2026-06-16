@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { TEMPLATES } from "@/lib/automation-templates";
+import { WorkflowBuilder } from "@/components/workflow-builder";
 import { addWorkflowFromTemplate, addWebhookWorkflow, toggleWorkflow, deleteWorkflow } from "./actions";
 
 type Step = Record<string, unknown>;
@@ -54,6 +55,9 @@ export default async function AutomationsPage() {
           ))}
         </div>
       </div>
+
+      {/* Custom builder */}
+      <WorkflowBuilder />
 
       {/* Outbound webhook */}
       <form action={addWebhookWorkflow} className="card mt-4">

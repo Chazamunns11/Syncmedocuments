@@ -13,7 +13,7 @@ type Activity = { id: string; type: string; body: string | null; title: string |
 type Deal = { id: string; title: string; stage_id: string };
 type Stage = { id: string; name: string };
 type Task = { id: string; title: string; done: boolean; due_on: string | null };
-type TagLink = { tag_id: string; tags: { name: string } | { name: string }[] | null };
+type TagLink = { tag_id: string; tags: { name: string; color: string } | { name: string; color: string }[] | null };
 
 export default async function ContactDetailPage({ params }: { params: { id: string } }) {
   const supabase = createClient();
@@ -42,7 +42,7 @@ export default async function ContactDetailPage({ params }: { params: { id: stri
         .select("id, title, done, due_on")
         .eq("contact_id", params.id)
         .order("done", { ascending: true }),
-      supabase.from("contact_tags").select("tag_id, tags(name)").eq("contact_id", params.id),
+      supabase.from("contact_tags").select("tag_id, tags(name, color)").eq("contact_id", params.id),
     ]);
 
   const activities = (acts as Activity[]) || [];
@@ -51,7 +51,7 @@ export default async function ContactDetailPage({ params }: { params: { id: stri
   const tasks = (taskRows as Task[]) || [];
   const tags = ((tagRows as TagLink[]) || []).map((r) => {
     const t = Array.isArray(r.tags) ? r.tags[0] : r.tags;
-    return { tag_id: r.tag_id, name: t?.name ?? "" };
+    return { tag_id: r.tag_id, name: t?.name ?? "", color: t?.color ?? "#8FB7A3" };
   });
   const stageName = (id: string) => stages.find((s) => s.id === id)?.name ?? "";
   const firstStage = stages[0]?.id ?? "";
@@ -98,7 +98,8 @@ export default async function ContactDetailPage({ params }: { params: { id: stri
             <div className="mb-3 flex flex-wrap gap-2">
               {tags.length === 0 && <span className="text-sm text-muted">No tags yet.</span>}
               {tags.map((t) => (
-                <span key={t.tag_id} className="inline-flex items-center gap-1 rounded-full bg-mint px-2.5 py-1 text-xs text-deep-green">
+                <span key={t.tag_id} className="inline-flex items-center gap-1.5 rounded-full bg-mint px-2.5 py-1 text-xs text-deep-green">
+                  <span className="h-2 w-2 rounded-full" style={{ backgroundColor: t.color }} />
                   {t.name}
                   <form action={removeContactTag} className="inline">
                     <input type="hidden" name="contact_id" value={contact.id} />
@@ -111,6 +112,7 @@ export default async function ContactDetailPage({ params }: { params: { id: stri
             <form action={addTagByName} className="flex gap-2">
               <input type="hidden" name="contact_id" value={contact.id} />
               <input name="name" className="input" placeholder="Add a tag (e.g. VIP, Lead)" />
+              <input name="color" type="color" defaultValue="#8FB7A3" className="h-9 w-11 shrink-0 rounded border border-deep-green/15" title="Tag colour" />
               <button className="btn-primary shrink-0">Add</button>
             </form>
           </div>
