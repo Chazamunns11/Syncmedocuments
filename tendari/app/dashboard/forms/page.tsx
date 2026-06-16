@@ -36,7 +36,7 @@ export default async function FormsPage() {
                 <li key={f.id} className="px-5 py-4">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-sm font-medium text-ink">{f.name}</p>
+                      <a href={`/dashboard/forms/${f.id}`} className="text-sm font-medium text-ink hover:text-forest">{f.name} ✎</a>
                       <a href={link} target="_blank" className="text-xs text-forest hover:underline">
                         {base ? link : `/f/${f.token}`}
                       </a>
