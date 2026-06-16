@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { getAccount } from "@/lib/account";
+import { routeClient } from "@/lib/supabase/route";
 import { googleConfigured, googleAuthUrl } from "@/lib/google";
 
 export async function GET(request: NextRequest) {
@@ -9,10 +9,20 @@ export async function GET(request: NextRequest) {
     settings.searchParams.set("google", "notconfigured");
     return NextResponse.redirect(settings);
   }
-  const account = await getAccount();
-  if (!account) {
-    return NextResponse.redirect(new URL("/login", request.url));
+
+  const { supabase, applyCookies } = routeClient(request);
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) {
+    return applyCookies(NextResponse.redirect(new URL("/login", request.url)));
   }
-  // state = account id (re-verified against the session on callback)
-  return NextResponse.redirect(googleAuthUrl(account.accountId));
+
+  const { data } = await supabase.from("users").select("account_id").eq("id", user.id).single();
+  if (!data?.account_id) {
+    return applyCookies(NextResponse.redirect(new URL("/login", request.url)));
+  }
+
+  // state = account id (used as a fallback in the callback)
+  return applyCookies(NextResponse.redirect(googleAuthUrl(data.account_id)));
 }
