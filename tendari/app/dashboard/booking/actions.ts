@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getAccount } from "@/lib/account";
 
@@ -19,8 +20,45 @@ export async function createMeetingType(formData: FormData) {
   if (!name) return;
 
   const supabase = createClient();
-  await supabase.from("meeting_types").insert({ account_id: account.accountId, name, duration_min });
+  const { data } = await supabase
+    .from("meeting_types")
+    .insert({ account_id: account.accountId, name, duration_min })
+    .select("id")
+    .single();
   revalidatePath("/dashboard/booking");
+  if (data?.id) redirect(`/dashboard/booking/${data.id}`);
+}
+
+export async function updateMeetingType(formData: FormData) {
+  const id = String(formData.get("id") || "");
+  if (!id) return;
+  const num = (k: string, def: number) => {
+    const n = Number(formData.get(k));
+    return Number.isFinite(n) ? n : def;
+  };
+  const maxRaw = String(formData.get("max_per_day") || "").trim();
+  let questions: unknown = [];
+  try {
+    questions = JSON.parse(String(formData.get("questions") || "[]"));
+  } catch {
+    questions = [];
+  }
+
+  const supabase = createClient();
+  await supabase
+    .from("meeting_types")
+    .update({
+      name: String(formData.get("name") || "").trim() || "Meeting",
+      duration_min: Math.max(5, Math.min(480, num("duration_min", 30))),
+      description: String(formData.get("description") || "").trim() || null,
+      buffer_min: Math.max(0, num("buffer_min", 0)),
+      min_notice_min: Math.max(0, num("min_notice_min", 120)),
+      max_per_day: maxRaw ? Math.max(1, Number(maxRaw)) : null,
+      questions,
+    })
+    .eq("id", id);
+  revalidatePath("/dashboard/booking");
+  revalidatePath(`/dashboard/booking/${id}`);
 }
 
 export async function deleteMeetingType(formData: FormData) {

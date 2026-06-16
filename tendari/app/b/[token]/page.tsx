@@ -7,9 +7,15 @@ import { submitBooking } from "./actions";
 
 export const dynamic = "force-dynamic";
 
+type Question = { key: string; label: string; type: string; required?: boolean; options?: string[] };
 type Ctx = {
   name: string;
+  description: string | null;
   duration_min: number;
+  buffer_min: number;
+  min_notice_min: number;
+  max_per_day: number | null;
+  questions: Question[];
   timezone: string;
   rules: Rule[];
   booked: Booked[];
@@ -89,6 +95,25 @@ export default async function PublicBookingPage({
             <label className="label">Phone</label>
             <input name="phone" className="input" />
           </div>
+          {(ctx.questions || []).map((q, i) => (
+            <div key={`${q.key}-${i}`}>
+              {q.type !== "checkbox" && <label className="label">{q.label}{q.required ? " *" : ""}</label>}
+              {q.type === "textarea" ? (
+                <textarea name={q.key} required={q.required} className="input min-h-24" />
+              ) : q.type === "select" ? (
+                <select name={q.key} required={q.required} className="input" defaultValue="">
+                  <option value="" disabled>Choose…</option>
+                  {(q.options || []).map((o) => <option key={o} value={o}>{o}</option>)}
+                </select>
+              ) : q.type === "checkbox" ? (
+                <label className="flex items-center gap-2 text-sm text-ink">
+                  <input type="checkbox" name={q.key} value="yes" required={q.required} /> {q.label}
+                </label>
+              ) : (
+                <input name={q.key} type={q.type === "email" ? "email" : q.type === "number" ? "number" : "text"} required={q.required} className="input" />
+              )}
+            </div>
+          ))}
           <div className="flex gap-2">
             <Link href={`/b/${params.token}`} className="btn-ghost">Back</Link>
             <button className="btn-primary flex-1">Confirm booking</button>
@@ -100,14 +125,22 @@ export default async function PublicBookingPage({
 
   // Step 1: pick a slot.
   const days = computeSlots(
-    { durationMin: ctx.duration_min, rules: ctx.rules || [], booked: ctx.booked || [], tz: ctx.timezone || "UTC" },
-    { days: 14, minNoticeMin: 120 },
+    {
+      durationMin: ctx.duration_min,
+      bufferMin: ctx.buffer_min ?? 0,
+      maxPerDay: ctx.max_per_day ?? null,
+      rules: ctx.rules || [],
+      booked: ctx.booked || [],
+      tz: ctx.timezone || "UTC",
+    },
+    { days: 14, minNoticeMin: ctx.min_notice_min ?? 120 },
   );
 
   return (
     <Shell>
       <h1 className="text-xl font-semibold text-deep-green">{ctx.name}</h1>
       <p className="mt-1 text-sm text-muted">{ctx.duration_min} minutes · times shown in {ctx.timezone || "UTC"}</p>
+      {ctx.description && <p className="mt-2 whitespace-pre-wrap text-sm text-ink">{ctx.description}</p>}
       {searchParams.taken === "1" && (
         <p className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">
           Sorry, that slot was just taken — please pick another.

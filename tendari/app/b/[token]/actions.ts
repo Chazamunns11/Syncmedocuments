@@ -13,6 +13,13 @@ export async function submitBooking(formData: FormData) {
   const email = String(formData.get("email") || "");
   if (!token || !start) return;
 
+  // Collect any custom-question answers (everything except the known fields).
+  const known = new Set(["token", "start", "first_name", "last_name", "email", "phone"]);
+  const answers: Record<string, string> = {};
+  for (const [k, v] of formData.entries()) {
+    if (!known.has(k)) answers[k] = String(v);
+  }
+
   const supabase = createClient();
   const { data: ok } = await supabase.rpc("submit_booking", {
     p_token: token,
@@ -21,6 +28,7 @@ export async function submitBooking(formData: FormData) {
     p_last: last,
     p_email: email,
     p_phone: String(formData.get("phone") || ""),
+    p_answers: answers,
   });
 
   if (ok === false) {

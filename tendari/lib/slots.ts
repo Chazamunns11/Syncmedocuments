@@ -60,6 +60,8 @@ function ymdInTz(date: Date, tz: string): { y: number; m: number; d: number } {
 export function computeSlots(
   opts: {
     durationMin: number;
+    bufferMin?: number;
+    maxPerDay?: number | null;
     rules: Rule[];
     booked: Booked[];
     tz: string;
@@ -69,14 +71,17 @@ export function computeSlots(
   const tz = opts.tz || "UTC";
   const days = cfg.days ?? 14;
   const minNoticeMs = (cfg.minNoticeMin ?? 120) * 60_000;
+  const bufferMs = (opts.bufferMin ?? 0) * 60_000;
   const gran = cfg.granularityMin ?? opts.durationMin;
   const now = Date.now();
   const earliest = now + minNoticeMs;
 
-  const busy = opts.booked.map((b) => ({
+  const rawBusy = opts.booked.map((b) => ({
     start: new Date(b.start).getTime(),
     end: new Date(b.end).getTime(),
   }));
+  // Extend busy intervals by the buffer so slots can't butt up against a booking.
+  const busy = rawBusy.map((b) => ({ start: b.start - bufferMs, end: b.end + bufferMs }));
 
   const out: DaySlots[] = [];
 
@@ -87,6 +92,14 @@ export function computeSlots(
     const weekday = new Date(Date.UTC(y, m, d, 12)).getUTCDay();
     const rules = opts.rules.filter((r) => r.weekday === weekday);
     if (rules.length === 0) continue;
+
+    // Respect max-per-day: count existing bookings whose start is on this day.
+    if (opts.maxPerDay && opts.maxPerDay > 0) {
+      const dayStart = wallToUtc(y, m, d, 0, tz).getTime();
+      const dayEnd = dayStart + 86_400_000;
+      const onDay = rawBusy.filter((b) => b.start >= dayStart && b.start < dayEnd).length;
+      if (onDay >= opts.maxPerDay) continue;
+    }
 
     const slots: Slot[] = [];
     for (const r of rules) {

@@ -68,7 +68,7 @@ export default async function BookingPage() {
                   <li key={m.id} className="px-5 py-3.5">
                     <div className="flex items-center justify-between">
                       <div>
-                        <p className="text-sm font-medium text-ink">{m.name} · {m.duration_min} min</p>
+                        <a href={`/dashboard/booking/${m.id}`} className="text-sm font-medium text-ink hover:text-forest">{m.name} · {m.duration_min} min ✎</a>
                         <a href={`${base}/b/${m.token}`} target="_blank" className="text-xs text-forest hover:underline">
                           {base ? `${base}/b/${m.token}` : `/b/${m.token}`}
                         </a>
