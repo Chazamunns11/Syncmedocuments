@@ -1,8 +1,10 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { getAccount } from "@/lib/account";
-import { formatMoney } from "@/lib/format";
+import { formatMoney, formatDateTime } from "@/lib/format";
 import { ReplayTourButton } from "@/components/onboarding-tour";
+
+type Booking = { id: string; name: string | null; email: string | null; starts_at: string };
 
 export default async function DashboardHome() {
   const account = await getAccount();
@@ -17,13 +19,22 @@ export default async function DashboardHome() {
     { count: openTasks },
     { data: openDealRows },
     { data: wonRows },
+    { data: bookingRows },
   ] = await Promise.all([
     supabase.from("contacts").select("*", { count: "exact", head: true }),
     supabase.from("deals").select("*", { count: "exact", head: true }).eq("status", "open"),
     supabase.from("tasks").select("*", { count: "exact", head: true }).eq("done", false),
     supabase.from("deals").select("value_cents").eq("status", "open"),
     supabase.from("deals").select("value_cents").eq("status", "won").gte("updated_at", monthStart),
+    supabase
+      .from("bookings")
+      .select("id, name, email, starts_at")
+      .eq("status", "confirmed")
+      .gte("starts_at", new Date().toISOString())
+      .order("starts_at")
+      .limit(5),
   ]);
+  const upcoming = (bookingRows as Booking[]) || [];
 
   const sum = (rows: { value_cents: number }[] | null) =>
     (rows || []).reduce((s, r) => s + (r.value_cents || 0), 0);
@@ -61,6 +72,24 @@ export default async function DashboardHome() {
           </Link>
         ))}
       </div>
+
+      {/* Upcoming bookings */}
+      {upcoming.length > 0 && (
+        <div className="mt-8 card">
+          <div className="mb-2 flex items-center justify-between">
+            <h2 className="text-lg font-semibold text-deep-green">Upcoming bookings</h2>
+            <Link href="/dashboard/booking" className="text-sm text-forest">View all</Link>
+          </div>
+          <ul className="divide-y divide-deep-green/10">
+            {upcoming.map((b) => (
+              <li key={b.id} className="flex items-center justify-between py-2.5">
+                <span className="text-sm text-ink">{b.name || b.email || "Guest"}</span>
+                <span className="text-xs text-muted">{formatDateTime(b.starts_at, account?.timezone)}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       {/* Getting-started checklist */}
       <div className="mt-8 card">

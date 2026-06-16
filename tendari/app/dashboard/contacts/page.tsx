@@ -51,11 +51,12 @@ export default async function ContactsPage({
 
   return (
     <div>
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-semibold text-deep-green">Contacts</h1>
           <p className="mt-1 text-muted">Everyone in your world, in one tidy place.</p>
         </div>
+        <a href="/api/export/contacts" className="btn-ghost shrink-0">Export CSV</a>
       </div>
 
       {/* Add contact — inline, one line, no modal. Ease of use first. */}
