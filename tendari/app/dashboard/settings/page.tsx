@@ -1,6 +1,7 @@
 import { getAccount } from "@/lib/account";
 import { createClient } from "@/lib/supabase/server";
 import { googleConfigured } from "@/lib/google";
+import { ChangePassword } from "@/components/change-password";
 import { updateAccount, disconnectGoogle } from "./actions";
 
 const TIMEZONES = [
@@ -82,6 +83,8 @@ export default async function SettingsPage({
         </p>
         <p className="mt-1 text-xs text-muted">Billing (Stripe) arrives in a later phase — no card charged during the trial setup.</p>
       </div>
+
+      <ChangePassword />
 
       <div className="card mt-6 max-w-lg">
         <p className="label">Sign out</p>
